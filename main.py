@@ -2,6 +2,7 @@ import requests
 import json
 import sqlite3
 import sys
+import logging
 from sqlite3 import Error
 from bs4 import BeautifulSoup
 import time as tm
@@ -11,6 +12,17 @@ import pandas as pd
 from urllib.parse import quote
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
+
+def init_logger():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler("main.log"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
 
 
 def load_config(file_name):
@@ -28,17 +40,17 @@ def get_with_retry(url, config, retries=3, delay=2):
                 r = requests.get(url, headers=config['headers'], timeout=5)
             if r.status_code != 200:
                 if r.status_code == 429 and i < (retries - 1):
-                    print(f"Too many requests for URL: {url}, retrying in {delay}s...")
+                    logging.info(f"Too many requests for URL: {url}, retrying in {delay}s...")
                     tm.sleep(delay)
                     continue
                 else:
-                    print(f"FAILED to request from URL: {url}, response status code: {r.status_code}")
+                    logging.error(f"FAILED to request from URL: {url}, response status code: {r.status_code}")
             return BeautifulSoup(r.content, 'html.parser')
         except requests.exceptions.Timeout:
-            print(f"Timeout occurred for URL: {url}, retrying in {delay}s...")
+            logging.info(f"Timeout occurred for URL: {url}, retrying in {delay}s...")
             tm.sleep(delay)
         except Exception as e:
-            print(f"An error occurred while retrieving the URL: {url}, error: {e}")
+            logging.error(f"An error occurred while retrieving the URL: {url}, error: {e}")
     return None
 
 def transform(soup):
@@ -47,7 +59,7 @@ def transform(soup):
     try:
         divs = soup.find_all('div', class_='base-search-card__info')
     except:
-        print("Empty page, no jobs found")
+        logging.info("Empty page, no jobs found")
         return joblist
     for item in divs:
         title = item.find('h3').text.strip()
@@ -96,6 +108,7 @@ def transform_job(soup):
         text = text.replace('Show less', '').replace('Show more', '')
         return text
     else:
+        logging.error("FAILED to find Job Description")
         return "Could not find Job Description"
 
 def safe_detect(text):
@@ -105,12 +118,18 @@ def safe_detect(text):
         return 'en'
 
 def remove_irrelevant_jobs(joblist, config):
-    #Filter out jobs based on description, title, and language. Set up in config.json.
-    new_joblist = [job for job in joblist if not any(word.lower() in job['job_description'].lower() for word in config['desc_words'])]   
-    new_joblist = [job for job in new_joblist if not any(word.lower() in job['title'].lower() for word in config['title_exclude'])] if len(config['title_exclude']) > 0 else new_joblist
+    #Filter out jobs based on title and language. Set up in config.json.
+    new_joblist = [job for job in joblist if not any(word.lower() in job['title'].lower() for word in config['title_exclude'])]
     new_joblist = [job for job in new_joblist if any(word.lower() in job['title'].lower() for word in config['title_include'])] if len(config['title_include']) > 0 else new_joblist
     new_joblist = [job for job in new_joblist if safe_detect(job['job_description']) in config['languages']] if len(config['languages']) > 0 else new_joblist
     new_joblist = [job for job in new_joblist if not any(word.lower() in job['company'].lower() for word in config['company_exclude'])] if len(config['company_exclude']) > 0 else new_joblist
+
+    return new_joblist
+
+def remove_irrelevant_jobs_by_decriptions(joblist, config):
+    #Filter out jobs based on descriptions
+    new_joblist = [job for job in joblist if not any(word.lower() in job['job_description'].lower() for word in config['desc_words_include'])]
+    new_joblist = [job for job in joblist if any(word.lower() in job['job_description'].lower() for word in config['desc_words_exclude'])] if len(config['desc_words_exclude']) > 0 else new_joblist
 
     return new_joblist
 
@@ -146,7 +165,7 @@ def create_connection(config):
         conn = sqlite3.connect(path) # creates a SQL database in the 'data' directory
         #print(sqlite3.version)
     except Error as e:
-        print(e)
+        logging.error(f"Error thrown while attempting to connect to database, error: {e}")
 
     return conn
 
@@ -198,7 +217,7 @@ def create_table(conn, df, table_name):
     # Commit the transaction
     conn.commit()
 
-    print(f"Created the {table_name} table and added {len(df)} records")
+    logging.info(f"Created the {table_name} table and added {len(df)} records")
 
 def update_table(conn, df, table_name):
     # Update the existing table with new records.
@@ -210,9 +229,9 @@ def update_table(conn, df, table_name):
     # If there are new records, append them to the existing table
     if len(df_new_records) > 0:
         df_new_records.to_sql(table_name, conn, if_exists='append', index=False)
-        print (f"Added {len(df_new_records)} new records to the {table_name} table")
+        logging.info(f"Added {len(df_new_records)} new records to the {table_name} table")
     else:
-        print (f"No new records to add to the {table_name} table")
+        logging.info(f"No new records to add to the {table_name} table")
 
 def table_exists(conn, table_name):
     # Check if the table already exists in the database
@@ -242,12 +261,12 @@ def get_jobcards(config):
                 soup = get_with_retry(url, config)
                 jobs = transform(soup)
                 all_jobs = all_jobs + jobs
-                print("Finished scraping page: ", url)
-    print ("Total job cards scraped: ", len(all_jobs))
+                logging.info(f"Finished scraping page: {url}")
+    logging.info(f"Total job cards scraped: {len(all_jobs)}")
     all_jobs = remove_duplicates(all_jobs, config)
-    print ("Total job cards after removing duplicates: ", len(all_jobs))
+    logging.info(f"Total job cards after removing duplicates: {len(all_jobs)}")
     all_jobs = remove_irrelevant_jobs(all_jobs, config)
-    print ("Total job cards after removing irrelevant jobs: ", len(all_jobs))
+    logging.info(f"Total job cards after removing irrelevant jobs: {len(all_jobs)}")
     return all_jobs
 
 def find_new_jobs(all_jobs, conn, config):
@@ -268,6 +287,8 @@ def find_new_jobs(all_jobs, conn, config):
     return new_joblist
 
 def main(config_file):
+    init_logger()
+    logging.info("Start scraping...")
     start_time = tm.perf_counter()
     job_list = []
 
@@ -279,9 +300,10 @@ def main(config_file):
     conn = create_connection(config)
     #filtering out jobs that are already in the database
     all_jobs = find_new_jobs(all_jobs, conn, config)
-    print ("Total new jobs found after comparing to the database: ", len(all_jobs))
+    logging.info(f"Total new jobs found after comparing to the database: {len(all_jobs)}")
 
     if len(all_jobs) > 0:
+        missing_job_description_count = 0
 
         for job in all_jobs:
             job_date = convert_date_format(job['date'])
@@ -289,17 +311,19 @@ def main(config_file):
             #if job is older than a week, skip it
             if job_date < datetime.now() - timedelta(days=config['days_to_scrape']):
                 continue
-            print('Found new job: ', job['title'], 'at ', job['company'], job['job_url'])
+            logging.info(f"Found new job: {job['title']} at {job['company']} {job['job_url']}")
             desc_soup = get_with_retry(job['job_url'], config, 4, 2)
             job['job_description'] = transform_job(desc_soup)
+            missing_job_description_count += 1 if "Could not find Job Description" == job['job_description'] else 0
             language = safe_detect(job['job_description'])
             if language not in config['languages']:
-                print('Job description language not supported: ', language)
+                logging.info(f"Job description language not supported: {language}")
                 #continue
             job_list.append(job)
+        logging.info(f"Total jobs without descriptions: {missing_job_description_count}/{len(job_list)}")
         #Final check - removing jobs based on job description keywords words from the config file
-        jobs_to_add = remove_irrelevant_jobs(job_list, config)
-        print ("Total jobs to add: ", len(jobs_to_add))
+        jobs_to_add = remove_irrelevant_jobs_by_decriptions(job_list, config)
+        logging.info(f"Total jobs to add after filtering: {len(jobs_to_add)}")
         #Create a list for jobs removed based on job description keywords - they will be added to the filtered_jobs table
         filtered_list = [job for job in job_list if job not in jobs_to_add]
         df = pd.DataFrame(jobs_to_add)
@@ -322,16 +346,15 @@ def main(config_file):
             else:
                 create_table(conn, df_filtered, filtered_jobs_tablename)
         else:
-            print("Error! cannot create the database connection.")
+            logging.error("Error! cannot create the database connection.")
         
         df.to_csv('linkedin_jobs.csv', index=False, encoding='utf-8')
         df_filtered.to_csv('linkedin_jobs_filtered.csv', index=False, encoding='utf-8')
     else:
-        print("No jobs found")
+        logging.info("No jobs found")
     
     end_time = tm.perf_counter()
-    print(f"Scraping finished in {end_time - start_time:.2f} seconds")
-
+    logging.info(f"Scraping finished in {end_time - start_time:.2f} seconds")
 
 if __name__ == "__main__":
     config_file = 'config.json'  # default config file
