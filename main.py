@@ -18,7 +18,7 @@ def load_config(file_name):
     with open(file_name) as f:
         return json.load(f)
 
-def get_with_retry(url, config, retries=3, delay=1):
+def get_with_retry(url, config, retries=3, delay=2):
     # Get the URL with retries and delay
     for i in range(retries):
         try:
@@ -26,6 +26,13 @@ def get_with_retry(url, config, retries=3, delay=1):
                 r = requests.get(url, headers=config['headers'], proxies=config['proxies'], timeout=5)
             else:
                 r = requests.get(url, headers=config['headers'], timeout=5)
+            if r.status_code != 200:
+                if r.status_code == 429 and i < (retries - 1):
+                    print(f"Too many requests for URL: {url}, retrying in {delay}s...")
+                    tm.sleep(delay)
+                    continue
+                else:
+                    print(f"FAILED to request from URL: {url}, response status code: {r.status_code}")
             return BeautifulSoup(r.content, 'html.parser')
         except requests.exceptions.Timeout:
             print(f"Timeout occurred for URL: {url}, retrying in {delay}s...")
@@ -283,7 +290,7 @@ def main(config_file):
             if job_date < datetime.now() - timedelta(days=config['days_to_scrape']):
                 continue
             print('Found new job: ', job['title'], 'at ', job['company'], job['job_url'])
-            desc_soup = get_with_retry(job['job_url'], config)
+            desc_soup = get_with_retry(job['job_url'], config, 4, 2)
             job['job_description'] = transform_job(desc_soup)
             language = safe_detect(job['job_description'])
             if language not in config['languages']:
