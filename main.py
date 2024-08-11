@@ -1,4 +1,5 @@
 from logger import Logger
+import re
 import requests
 import json
 import sqlite3
@@ -117,8 +118,11 @@ def remove_irrelevant_jobs(joblist, config):
 
 def remove_irrelevant_jobs_by_decriptions(joblist, config):
     #Filter out jobs based on descriptions
-    new_joblist = [job for job in joblist if not any(word.lower() in job['job_description'].lower() for word in config['desc_words_include'])]
-    new_joblist = [job for job in joblist if any(word.lower() in job['job_description'].lower() for word in config['desc_words_exclude'])] if len(config['desc_words_exclude']) > 0 else new_joblist
+    new_joblist = [job for job in joblist if any(word.lower() in job['job_description'].lower() for word in config['desc_words_include'])]
+    new_joblist = [job for job in new_joblist if not any(word.lower() in job['job_description'].lower() for word in config['desc_words_exclude'])] if len(config['desc_words_exclude']) > 0 else new_joblist
+
+    exclude_regex = re.compile('|'.join('(?:{0})'.format(x) for x in config['desc_words_exclude_regex']))
+    new_joblist = [job for job in new_joblist if not re.search(exclude_regex, job['job_description'])] if len(config['desc_words_exclude_regex']) > 0 else new_joblist
 
     return new_joblist
 
@@ -143,7 +147,7 @@ def convert_date_format(date_string):
         job_date = datetime.strptime(date_string, date_format).date()
         return job_date
     except ValueError:
-        print(f"Error: The date for job {date_string} - is not in the correct format.")
+        log.error(f"Error: The date for job {date_string} - is not in the correct format.")
         return None
 
 def create_connection(config):
