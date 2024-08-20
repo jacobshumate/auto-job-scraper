@@ -22,12 +22,13 @@ def load_config(file_name):
 
 def get_with_retry(url, config, retries=3, delay=2):
     # Get the URL with retries and delay
+    headers = {'User-Agent': config['headers'][0]}
     for i in range(retries):
         try:
             if len(config['proxies']) > 0:
-                r = requests.get(url, headers=config['headers'], proxies=config['proxies'], timeout=5)
+                r = requests.get(url, headers=headers, proxies=config['proxies'], timeout=5)
             else:
-                r = requests.get(url, headers=config['headers'], timeout=5)
+                r = requests.get(url, headers=headers, timeout=5)
             if r.status_code != 200:
                 if r.status_code == 429 and i < (retries - 1):
                     log.info(f"Too many requests for URL: {url}, retrying in {delay}s...")
@@ -35,10 +36,12 @@ def get_with_retry(url, config, retries=3, delay=2):
                     continue
                 else:
                     log.error(f"FAILED to request from URL: {url}, response status code: {r.status_code}")
+                    break
             return BeautifulSoup(r.content, 'html.parser')
         except requests.exceptions.Timeout:
             log.info(f"Timeout occurred for URL: {url}, retrying in {delay}s...")
             tm.sleep(delay)
+            continue
         except Exception as e:
             log.error(f"An error occurred while retrieving the URL: {url}, error: {e}")
     return None
@@ -98,7 +101,7 @@ def transform_job(soup):
         text = text.replace('Show less', '').replace('Show more', '')
         return text
     else:
-        log.error("FAILED to find Job Description")
+        log.warning("FAILED to find Job Description")
         return "Could not find Job Description"
 
 def safe_detect(text):
@@ -245,6 +248,8 @@ def job_exists(df, job):
 def get_jobcards(config):
     #Function to get the job cards from the search results page
     all_jobs = []
+    successful_url_request_count = 0
+    total_url_request_count = 0
     for k in range(0, config['rounds']):
         for query in config['search_queries']:
             keywords = quote(query['keywords']) # URL encode the keywords
@@ -252,9 +257,13 @@ def get_jobcards(config):
             for i in range (0, config['pages_to_scrape']):
                 url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keywords}&location={location}&f_TPR=&f_WT={query['f_WT']}&geoId=&f_TPR={config['timespan']}&start={25*i}"
                 soup = get_with_retry(url, config)
-                jobs = transform(soup)
-                all_jobs = all_jobs + jobs
-                log.info(f"Finished scraping page: {url}")
+                total_url_request_count += 1
+                if soup:
+                    jobs = transform(soup)
+                    successful_url_request_count += 1
+                    all_jobs += jobs
+                    log.info(f"Finished scraping page: {url}")
+    log.info(f"{successful_url_request_count}/{total_url_request_count} - {int((successful_url_request_count / total_url_request_count) * 100)}% successful request rate")
     log.info(f"Total job cards scraped: {len(all_jobs)}")
     all_jobs = remove_duplicates(all_jobs, config)
     log.info(f"Total job cards after removing duplicates: {len(all_jobs)}")
@@ -304,14 +313,15 @@ def main(config_file):
             if job_date < datetime.now() - timedelta(days=config['days_to_scrape']):
                 continue
             log.info(f"Found new job: {job['title']} at {job['company']} {job['job_url']}")
-            desc_soup = get_with_retry(job['job_url'], config, 4, 2)
-            job['job_description'] = transform_job(desc_soup)
-            missing_job_description_count += 1 if "Could not find Job Description" == job['job_description'] else 0
-            language = safe_detect(job['job_description'])
-            if language not in config['languages']:
-                log.info(f"Job description language not supported: {language}")
-                #continue
-            job_list.append(job)
+            desc_soup = get_with_retry(job['job_url'], config, 4, 3)
+            if desc_soup:
+                job['job_description'] = transform_job(desc_soup)
+                missing_job_description_count += 1 if "Could not find Job Description" == job['job_description'] else 0
+                language = safe_detect(job['job_description'])
+                if language not in config['languages']:
+                    log.info(f"Job description language not supported: {language}")
+                    #continue
+                job_list.append(job)
         log.info(f"Total jobs without descriptions: {missing_job_description_count}/{len(job_list)}")
         #Final check - removing jobs based on job description keywords words from the config file
         jobs_to_add = remove_irrelevant_jobs_by_decriptions(job_list, config)
