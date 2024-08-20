@@ -14,7 +14,7 @@ from urllib.parse import quote
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 
-
+log = Logger('__main__', 'main.log')
 def load_config(file_name):
     # Load the config file
     with open(file_name) as f:
@@ -359,7 +359,6 @@ def main(config_file):
     log.info(f"Scraping finished in {end_time - start_time:.2f} seconds")
 
 if __name__ == "__main__":
-    log = Logger('__main__', 'main.log')
     config_file = 'config.json'  # default config file
     if len(sys.argv) == 2:
         config_file = sys.argv[1]
