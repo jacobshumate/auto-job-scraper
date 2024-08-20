@@ -2,7 +2,7 @@ from flask import Flask, render_template, jsonify
 import pandas as pd
 import sqlite3
 import json
-import openai
+from openai import OpenAI
 from pdfminer.high_level import extract_text
 from flask_cors import CORS
 
@@ -153,7 +153,9 @@ def get_resume(job_id):
         print("Error: OpenAI API key is empty.")
         return jsonify({"error": "OpenAI API key is empty."}), 400
 
-    openai.api_key = config["OpenAI_API_KEY"]
+    client = OpenAI(
+        api_key=config["OpenAI_API_KEY"]
+    )
     consideration = ""
     user_prompt = ("You are a career coach with a client that is applying for a job as a " 
                    + job['title'] + " at " + job['company'] 
@@ -166,7 +168,7 @@ def get_resume(job_id):
         user_prompt += "\nConsider incorporating that " + consideration
 
     try:
-        completion = openai.ChatCompletion.create(
+        completion = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "user", "content": user_prompt},
@@ -190,9 +192,9 @@ def get_CoverLetter(job_id):
     conn = sqlite3.connect(config["db_path"])
     cursor = conn.cursor()
 
-    def get_chat_gpt(prompt):
+    def get_chat_gpt(client, prompt):
         try:
-            completion = openai.ChatCompletion.create(
+            completion = client.chat.completions.create(
                 model=config["OpenAI_Model"],
                 messages=[
                     {"role": "user", "content": prompt},
@@ -221,19 +223,21 @@ def get_CoverLetter(job_id):
         print("Error: OpenAI API key is empty.")
         return jsonify({"error": "OpenAI API key is empty."}), 400
 
-    openai.api_key = config["OpenAI_API_KEY"]
+    client = OpenAI(
+        api_key=config["OpenAI_API_KEY"]
+    )
     consideration = ""
     user_prompt = ("You are a career coach with over 15 years of experience helping job seekers land their dream jobs in tech. You are helping a candidate to write a cover letter for the below role. Approach this task in three steps. Step 1. Identify main challenges someone in this position would face day to day. Step 2. Write an attention grabbing hook for your cover letter that highlights your experience and qualifications in a way that shows you empathize and can successfully take on challenges of the role. Consider incorporating specific examples of how you tackled these challenges in your past work, and explore creative ways to express your enthusiasm for the opportunity. Put emphasis on how the candidate can contribute to company as opposed to just listing accomplishments. Keep your hook within 100 words or less. Step 3. Finish writing the cover letter based on the resume and keep it within 250 words. Respond with final cover letter only. \n job description: " + job['job_description'] + "\n company: " + job['company'] + "\n title: " + job['title'] + "\n resume: " + resume)
     if consideration:
         user_prompt += "\nConsider incorporating that " + consideration
 
-    response = get_chat_gpt(user_prompt)
+    response = get_chat_gpt(client, user_prompt)
     if response is None:
         return jsonify({"error": "Failed to get a response from OpenAI."}), 500
 
     user_prompt2 = ("You are young but experienced career coach helping job seekers land their dream jobs in tech. I need your help crafting a cover letter. Here is a job description: " + job['job_description'] + "\nhere is my resume: " + resume + "\nHere's the cover letter I got so far: " + response + "\nI need you to help me improve it. Let's approach this in following steps. \nStep 1. Please set the formality scale as follows: 1 is conversational English, my initial Cover letter draft is 10. Step 2. Identify three to five ways this cover letter can be improved, and elaborate on each way with at least one thoughtful sentence. Step 4. Suggest an improved cover letter based on these suggestions with the Formality Score set to 7. Avoid subjective qualifiers such as drastic, transformational, etc. Keep the final cover letter within 250 words. Please respond with the final cover letter only.")
     if user_prompt2:
-        response = get_chat_gpt(user_prompt2)
+        response = get_chat_gpt(client, user_prompt2)
         if response is None:
             return jsonify({"error": "Failed to get a response from OpenAI."}), 500
 
