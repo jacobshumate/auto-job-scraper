@@ -1,4 +1,4 @@
-from logger import Logger
+from src.logger import Logger
 import re
 import requests
 import json
@@ -14,7 +14,7 @@ from urllib.parse import quote
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 
-log = Logger('__main__', '../log/main.log')
+log = Logger('__main__', 'log/main.log')
 def load_config(file_name):
     # Load the config file
     with open(file_name) as f:
