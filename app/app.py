@@ -11,7 +11,7 @@ def load_config(file_name):
     with open(file_name) as f:
         return json.load(f)
 
-config = load_config('config.json')
+config = load_config('../data/config.json')
 app = Flask(__name__)
 CORS(app)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
