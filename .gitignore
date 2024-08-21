@@ -1,7 +1,7 @@
 # .gitignore
 venv/
 *.csv
-config.json
+data/config.json
 test.py
 __pycache__/
 my_env/
@@ -14,4 +14,4 @@ indeed.py
 SupabaseUpload/
 python-job-scraper-script.bat
 start-job-scraper-batch-job.vbs
-main.log
+log/main.log
