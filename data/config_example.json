@@ -12,9 +12,7 @@
 
   "search_queries": [    
     {"keywords": "Python developer", "location": "Los Angeles", "f_WT": ""},
-    {"keywords": "Python developer", "location": "USA", "f_WT": "2"},
-    {"keywords": "Software Engineer", "location": "Boulder", "f_WT": "1"},
-    {"keywords": "Software Engineer", "location": "USA", "f_WT": "2"}
+    {"keywords": "Python developer", "location": "USA", "f_WT": "2"}
 
   ],
   "desc_words": [
