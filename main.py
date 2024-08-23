@@ -14,7 +14,8 @@ from urllib.parse import quote
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 
-log = Logger('__main__', 'log/main.log')
+log = Logger('__main__')
+
 def load_config(file_name):
     # Load the config file
     with open(file_name) as f:
@@ -350,8 +351,8 @@ def main(config_file):
         else:
             log.error("Error! cannot create the database connection.")
         
-        df.to_csv('data/linkedin_jobs.csv', index=False, encoding='utf-8')
-        df_filtered.to_csv('data/linkedin_jobs_filtered.csv', index=False, encoding='utf-8')
+        df.to_csv('data/linkedin_jobs.csv', mode='a', index=False, encoding='utf-8')
+        df_filtered.to_csv('data/linkedin_jobs_filtered.csv', mode='a', index=False, encoding='utf-8')
     else:
         log.info("No jobs found")
     

@@ -7,4 +7,3 @@ langdetect
 pysocks
 openai
 pdfminer.six
-flask_cors

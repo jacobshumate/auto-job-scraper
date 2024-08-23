@@ -1,0 +1,4 @@
+# START CRON JOB
+* * * * * /bin/echo "cron works on $(date)" >> /var/log/cron.log 2>&1
+#*/3 * * * * /usr/local/bin/python /app/main.py /app/data/config.json 2>&1 | tee /app/log/main.log
+# END CRON JOB
