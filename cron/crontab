@@ -1,0 +1,3 @@
+# START CRON JOB
+*/1 * * * * scraperuser /home/scraperuser/app/run_scraper.sh
+# END CRON JOB

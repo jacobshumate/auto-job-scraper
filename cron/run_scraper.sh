@@ -4,7 +4,7 @@
 PYTHON_INTERPRETER=/usr/local/bin/python
 SCRIPT_PATH=/home/scraperuser/app/main.py
 CONFIG_PATH=/home/scraperuser/app/data/config.json
-LOG_PATH=/home/scraperuser/app/data/main.log
+LOG_PATH=/home/scraperuser/app/data/log/main.log
 
 # Run the Python script and log the output
 $PYTHON_INTERPRETER $SCRIPT_PATH $CONFIG_PATH >> $LOG_PATH 2>&1

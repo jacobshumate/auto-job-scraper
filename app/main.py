@@ -1,5 +1,5 @@
 from components.logger import Logger
-from components.vpn_client import restart_vpn_client
+from components.vpn_manager import reset_vpn
 import re
 import requests
 import json
@@ -361,11 +361,11 @@ def main(config_file):
     log.info(f"Scraping finished in {end_time - start_time:.2f} seconds")
 
 if __name__ == "__main__":
-    running = restart_vpn_client()
-    if running:
-        config_file = 'data/config.json'  # default config file
+    successful = reset_vpn()
+    if successful:
+        config_file = '../data/config.json'  # default config file
         if len(sys.argv) == 2:
             config_file = sys.argv[1]
         # main(config_file)
     else:
-        log.error("VPN Client failed to run, will skip scraping...")
+        log.error("Gluetun failed to reset, will skip scraping...")
