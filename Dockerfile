@@ -9,8 +9,8 @@ WORKDIR /home/scraperuser/app
 ENV PYTHONPATH="/home/scraperuser/.local/lib/python3.12/site-packages:$PYTHONPATH"
 
 # Copy application files as non-root user
-COPY requirements.txt main.py run_scraper.sh ./
-ADD components ./components
+COPY requirements.txt app/main.py cron/run_scraper.sh ./
+ADD app/components ./components
 
 # Install Python packages as non-root user
 RUN pip install --no-cache-dir -r requirements.txt
@@ -25,7 +25,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Set up cron jobs
-COPY crontab /etc/cron.d/crontab
+COPY cron/crontab /etc/cron.d/crontab
 RUN dos2unix /etc/cron.d/crontab && \
     chmod 0644 /etc/cron.d/crontab && \
     touch /var/log/cron.log && \
