@@ -7,7 +7,6 @@ my_env/
 csv_to_db.py
 data/*.db
 indeed.py
-*.sh
 *.log
 SupabaseUpload/
 python-job-scraper-script.bat
