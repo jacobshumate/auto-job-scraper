@@ -12,4 +12,4 @@ SupabaseUpload/
 python-job-scraper-script.bat
 start-job-scraper-batch-job.vbs
 *.yml
-.env
+*.env
