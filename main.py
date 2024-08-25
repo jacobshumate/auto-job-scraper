@@ -1,4 +1,5 @@
 from components.logger import Logger
+from components.vpn_client import restart_vpn_client
 import re
 import requests
 import json
@@ -351,8 +352,8 @@ def main(config_file):
         else:
             log.error("Error! cannot create the database connection.")
         
-        df.to_csv('data/linkedin_jobs.csv', mode='a', index=False, encoding='utf-8')
-        df_filtered.to_csv('data/linkedin_jobs_filtered.csv', mode='a', index=False, encoding='utf-8')
+        df.to_csv('/app/data/linkedin_jobs.csv', mode='a', index=False, encoding='utf-8')
+        df_filtered.to_csv('/app/data/linkedin_jobs_filtered.csv', mode='a', index=False, encoding='utf-8')
     else:
         log.info("No jobs found")
     
@@ -360,8 +361,11 @@ def main(config_file):
     log.info(f"Scraping finished in {end_time - start_time:.2f} seconds")
 
 if __name__ == "__main__":
-    config_file = 'data/config.json'  # default config file
-    if len(sys.argv) == 2:
-        config_file = sys.argv[1]
-        
-    main(config_file)
+    running = restart_vpn_client()
+    if running:
+        config_file = 'data/config.json'  # default config file
+        if len(sys.argv) == 2:
+            config_file = sys.argv[1]
+        # main(config_file)
+    else:
+        log.error("VPN Client failed to run, will skip scraping...")
