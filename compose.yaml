@@ -1,0 +1,74 @@
+services:
+  auto-scraper:
+    container_name: web_scraper
+    build: .
+    volumes:
+      - db_data:/home/scraperuser/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=${DEBUG:-False}
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+    depends_on:
+      gluetun:
+          condition: service_healthy
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    pull_policy: always
+    container_name: gluetun
+    # line above must be uncommented to allow external containers to connect.
+    # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/connect-a-container-to-gluetun.md#external-container-to-gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8888:8888/tcp # HTTP proxy
+      - 8388:8388/tcp # Shadowsocks
+      - 8388:8388/udp # Shadowsocks
+    volumes:
+      - db_data:/gluetun
+    environment:
+      # See https://github.com/qdm12/gluetun-wiki/tree/main/setup#setup
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
+      - VPN_TYPE=${VPN_TYPE}
+      # OpenVPN:
+      - OPENVPN_USER=${VPN_USER}
+      - OPENVPN_PASSWORD=${VPN_PASSWORD}
+      - OPENVPN_VERBOSITY=1
+      # Timezone for accurate log times
+      - TZ=${TZ}
+      # Server list updater
+      # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/servers.md#update-the-vpn-servers-list
+      #      - UPDATER_PERIOD=
+      - SERVER_COUNTRIES=${VPN_SERVER_COUNTRIES}
+      - DEBUG=${DEBUG:-False}
+      - BLOCK_OUTSIDE_DNS=1
+      - DNS_OVER_TLS=on
+      - RANDOM_SERVER=on
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://${HEALTH_SERVER_ADDRESS}"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
+
+volumes:
+  db_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: data
+      o: bind
