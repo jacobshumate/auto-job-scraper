@@ -1,17 +1,35 @@
 FROM python:3.12-slim
-RUN apt-get update && apt-get -y install cron vim dos2unix wget
-WORKDIR /app
 
+# Add a non-root user
+RUN useradd -ms /bin/bash scraperuser
+
+# Switch to non-root user, set the working directory and pythonpath
+USER scraperuser
+WORKDIR /home/scraperuser/app
+ENV PYTHONPATH="/home/scraperuser/.local/lib/python3.12/site-packages:$PYTHONPATH"
+
+# Copy application files as non-root user
+COPY requirements.txt main.py run_scraper.sh ./
+ADD components ./components
+
+# Install Python packages as non-root user
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Switch to root to set up packages and cron jobs
+USER root
+
+# Install necessary packages and clean up
+RUN apt-get update && \
+    apt-get -y install cron vim dos2unix wget && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set up cron jobs
 COPY crontab /etc/cron.d/crontab
-RUN dos2unix /etc/cron.d/crontab /etc/cron.d/crontab
-RUN chmod 0644 /etc/cron.d/crontab
-RUN touch /var/log/cron.log
-RUN /usr/bin/crontab /etc/cron.d/crontab
+RUN dos2unix /etc/cron.d/crontab && \
+    chmod 0644 /etc/cron.d/crontab && \
+    touch /var/log/cron.log && \
+    /usr/bin/crontab /etc/cron.d/crontab
 
-COPY requirements.txt /app/requirements.txt
-ADD components /app/components
-COPY main.py /app/main.py
-RUN pip install -r /app/requirements.txt
-
-# run crond as main process of container
+# Set the CMD to run cron as root
 CMD ["cron", "-f"]
