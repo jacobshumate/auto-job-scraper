@@ -6,7 +6,6 @@ import re
 import requests
 import json
 import sqlite3
-import sys
 from sqlite3 import Error
 from bs4 import BeautifulSoup
 import time as tm
@@ -27,30 +26,30 @@ def load_config(file_name):
         return json.load(f)
 
 
-def get_with_retry(url, config, retries=3, delay=2):
+def get_with_retry(url, config, max_retries=5, delay=5):
     # Get the URL with retries and delay
     headers = {'User-Agent': config['headers'][0]}
-    for i in range(retries):
+    for attempt in range(max_retries):
         try:
             if len(config['proxies']) > 0:
-                r = requests.get(url, headers=headers, proxies=config['proxies'], timeout=5)
+                response = requests.get(url, headers=headers, proxies=config['proxies'], timeout=10)
             else:
-                r = requests.get(url, headers=headers, timeout=5)
-            if r.status_code != 200:
-                if r.status_code == 429 and i < (retries - 1):
-                    log.info(f"Too many requests for URL: {url}, retrying in {delay}s...")
-                    tm.sleep(delay)
-                    continue
-                else:
-                    log.error(f"FAILED to request from URL: {url}, response status code: {r.status_code}")
-                    break
-            return BeautifulSoup(r.content, 'html.parser')
-        except requests.exceptions.Timeout:
-            log.info(f"Timeout occurred for URL: {url}, retrying in {delay}s...")
+                response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 429:
+                log.info(f"Too many requests for {url}, retrying in {delay}s...")
+                tm.sleep(delay)
+                delay = min(delay * 2, 120) # Exponential backoff, max 120 seconds
+                continue
+            else:
+                response.raise_for_status()
+                return BeautifulSoup(response.content, 'html.parser')
+        except requests.exceptions.RequestException as e:
+            log.info(f"Request failed for {url} due to {e}, retrying in {delay}s...")
             tm.sleep(delay)
+            delay = min(delay * 2, 120)
             continue
         except Exception as e:
-            log.error(f"An error occurred while retrieving the URL: {url}, error: {e}")
+            log.error(f"An error occurred while retrieving {url}, error: {e}")
     return None
 
 
@@ -294,7 +293,7 @@ def get_jobcards(config):
                     jobs = transform(soup)
                     successful_url_request_count += 1
                     all_jobs += jobs
-                    log.info(f"Finished scraping page: {url}")
+                    log.info(f"Finished scraping {url}")
     log.info(
         f"{successful_url_request_count}/{total_url_request_count} - {int((successful_url_request_count / total_url_request_count) * 100)}% successful request rate")
     log.info(f"Total job cards scraped: {len(all_jobs)}")

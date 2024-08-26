@@ -90,11 +90,11 @@ def restart_gluetun_service():
 def get_vpn_ip(check_interval=CHECK_INTERVAL):
     """Get current VPN ip"""
     for url in IP_INFO_URLS:
-        response_json = make_request(url)
+        response_json = make_request(url, timeout=10)
         if not response_json:
             log.info(f"VPN IP not ready. Retrying in {check_interval} seconds...")
             time.sleep(check_interval)
-            check_interval = min(check_interval * 2, 10) # Exponential backoff, max 10 seconds
+            check_interval = min(check_interval * 2, 60) # Exponential backoff, max 60 seconds
             continue
         ip = response_json.get(IP)
         if ip:

@@ -1,6 +1,16 @@
 import logging
 import sys
+from datetime import datetime
 
+class LocalTimeFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        # Get the current local time from the timestamp
+        local_time = datetime.fromtimestamp(record.created)
+        if datefmt:
+            # Format to include only milliseconds
+            return local_time.strftime(datefmt)[:-3]
+        else:
+            return local_time.isoformat()
 
 class Logger:
     level_relations = {
@@ -12,14 +22,19 @@ class Logger:
     }  # relationship mapping
 
     def __init__(self, modulename, level='info', fmt='%(asctime)s [%(levelname)s] %(message)s'):
-        logging.basicConfig(
-            level=self.level_relations.get(level),
-            format=fmt,
-            handlers=[
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
         self.logger = logging.getLogger(modulename)
+        if not self.logger.handlers:
+            self.logger.setLevel(self.level_relations.get(level))
+
+            handler = logging.StreamHandler(sys.stdout)
+            formatter = LocalTimeFormatter(fmt, datefmt='%m-%d %H:%M:%S,%f')
+            handler.setFormatter(formatter)
+
+            self.logger.addHandler(handler)
+
+    def set_level(self, level):
+        """Dynamically set the log level."""
+        self.logger.setLevel(self.level_relations.get(level))
 
     def debug(self, message):
         self.logger.debug(message)
