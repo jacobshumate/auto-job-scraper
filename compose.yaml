@@ -42,7 +42,7 @@ services:
       # Server list updater
       # See https://github.com/qdm12/gluetun-wiki/blob/main/setup/servers.md#update-the-vpn-servers-list
       #      - UPDATER_PERIOD=
-      - SERVER_COUNTRIES=${VPN_SERVER_COUNTRIES}
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES}
       - DEBUG=${DEBUG:-False}
       - BLOCK_OUTSIDE_DNS=1
       - DNS_OVER_TLS=on

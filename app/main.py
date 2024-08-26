@@ -1,5 +1,7 @@
 from components.logger import Logger
 from components.vpn_manager import reset_vpn
+import argparse
+import os
 import re
 import requests
 import json
@@ -17,10 +19,13 @@ from langdetect.lang_detect_exception import LangDetectException
 
 log = Logger('__main__')
 
+
 def load_config(file_name):
+    file_path = get_path("data",  file_name)
     # Load the config file
-    with open(file_name) as f:
+    with open(file_path) as f:
         return json.load(f)
+
 
 def get_with_retry(url, config, retries=3, delay=2):
     # Get the URL with retries and delay
@@ -48,6 +53,7 @@ def get_with_retry(url, config, retries=3, delay=2):
             log.error(f"An error occurred while retrieving the URL: {url}, error: {e}")
     return None
 
+
 def transform(soup):
     # Parsing the job card info (title, company, location, date, job_url) from the beautiful soup object
     joblist = []
@@ -63,9 +69,9 @@ def transform(soup):
         parent_div = item.parent
         entity_urn = parent_div['data-entity-urn']
         job_posting_id = entity_urn.split(':')[-1]
-        job_url = 'https://www.linkedin.com/jobs/view/'+job_posting_id+'/'
+        job_url = 'https://www.linkedin.com/jobs/view/' + job_posting_id + '/'
 
-        date_tag_new = item.find('time', class_ = 'job-search-card__listdate--new')
+        date_tag_new = item.find('time', class_='job-search-card__listdate--new')
         date_tag = item.find('time', class_='job-search-card__listdate')
         date = date_tag['datetime'] if date_tag else date_tag_new['datetime'] if date_tag_new else ''
         job_description = ''
@@ -83,6 +89,7 @@ def transform(soup):
         }
         joblist.append(job)
     return joblist
+
 
 def transform_job(soup):
     div = soup.find('div', class_='description__text description__text--rich')
@@ -106,36 +113,51 @@ def transform_job(soup):
         log.warning("FAILED to find Job Description")
         return "Could not find Job Description"
 
+
 def safe_detect(text):
     try:
         return detect(text)
     except LangDetectException:
         return 'en'
 
+
 def remove_irrelevant_jobs(joblist, config):
     #Filter out jobs based on title and language. Set up in config.json.
-    new_joblist = [job for job in joblist if not any(word.lower() in job['title'].lower() for word in config['title_exclude'])]
-    new_joblist = [job for job in new_joblist if any(word.lower() in job['title'].lower() for word in config['title_include'])] if len(config['title_include']) > 0 else new_joblist
-    new_joblist = [job for job in new_joblist if safe_detect(job['job_description']) in config['languages']] if len(config['languages']) > 0 else new_joblist
-    new_joblist = [job for job in new_joblist if not any(word.lower() in job['company'].lower() for word in config['company_exclude'])] if len(config['company_exclude']) > 0 else new_joblist
+    new_joblist = [job for job in joblist if
+                   not any(word.lower() in job['title'].lower() for word in config['title_exclude'])]
+    new_joblist = [job for job in new_joblist if
+                   any(word.lower() in job['title'].lower() for word in config['title_include'])] if len(
+        config['title_include']) > 0 else new_joblist
+    new_joblist = [job for job in new_joblist if safe_detect(job['job_description']) in config['languages']] if len(
+        config['languages']) > 0 else new_joblist
+    new_joblist = [job for job in new_joblist if
+                   not any(word.lower() in job['company'].lower() for word in config['company_exclude'])] if len(
+        config['company_exclude']) > 0 else new_joblist
 
     return new_joblist
+
 
 def remove_irrelevant_jobs_by_decriptions(joblist, config):
     #Filter out jobs based on descriptions
-    new_joblist = [job for job in joblist if any(word.lower() in job['job_description'].lower() for word in config['desc_words_include'])]
-    new_joblist = [job for job in new_joblist if not any(word.lower() in job['job_description'].lower() for word in config['desc_words_exclude'])] if len(config['desc_words_exclude']) > 0 else new_joblist
+    new_joblist = [job for job in joblist if
+                   any(word.lower() in job['job_description'].lower() for word in config['desc_words_include'])]
+    new_joblist = [job for job in new_joblist if not any(
+        word.lower() in job['job_description'].lower() for word in config['desc_words_exclude'])] if len(
+        config['desc_words_exclude']) > 0 else new_joblist
 
     exclude_regex = re.compile('|'.join('(?:{0})'.format(x) for x in config['desc_words_exclude_regex']))
-    new_joblist = [job for job in new_joblist if not re.search(exclude_regex, job['job_description'])] if len(config['desc_words_exclude_regex']) > 0 else new_joblist
+    new_joblist = [job for job in new_joblist if not re.search(exclude_regex, job['job_description'])] if len(
+        config['desc_words_exclude_regex']) > 0 else new_joblist
 
     return new_joblist
+
 
 def remove_duplicates(joblist, config):
     # Remove duplicate jobs in the joblist. Duplicate is defined as having the same title and company.
     joblist.sort(key=lambda x: (x['title'], x['company']))
     joblist = [next(g) for k, g in groupby(joblist, key=lambda x: (x['title'], x['company']))]
     return joblist
+
 
 def convert_date_format(date_string):
     """
@@ -155,17 +177,20 @@ def convert_date_format(date_string):
         log.error(f"Error: The date for job {date_string} - is not in the correct format.")
         return None
 
+
 def create_connection(config):
     # Create a database connection to a SQLite database
     conn = None
-    path = config['db_path']
     try:
-        conn = sqlite3.connect(path) # creates a SQL database in the 'data' directory
+        # Convert the relative path to an absolute path
+        path = get_path("data", config["db_path"])
+        conn = sqlite3.connect(path)  # creates a SQL database in the 'data' directory
         #print(sqlite3.version)
     except Error as e:
         log.error(f"Error thrown while attempting to connect to database, error: {e}")
 
     return conn
+
 
 def create_table(conn, df, table_name):
     ''''
@@ -182,13 +207,13 @@ def create_table(conn, df, table_name):
         'object': 'TEXT',
         'bool': 'INTEGER'
     }
-    
+
     # Prepare a string with column names and their types
     columns_with_types = ', '.join(
         f'"{column}" {type_mapping[str(df.dtypes[column])]}'
         for column in df.columns
     )
-    
+
     # Prepare SQL query to create a new table
     create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS "{table_name}" (
@@ -196,11 +221,11 @@ def create_table(conn, df, table_name):
             {columns_with_types}
         );
     """
-    
+
     # Execute SQL query
     cursor = conn.cursor()
     cursor.execute(create_table_sql)
-    
+
     # Commit the transaction
     conn.commit()
 
@@ -211,11 +236,12 @@ def create_table(conn, df, table_name):
     """
     for record in df.to_dict(orient='records'):
         cursor.execute(insert_sql, list(record.values()))
-    
+
     # Commit the transaction
     conn.commit()
 
     log.info(f"Created the {table_name} table and added {len(df)} records")
+
 
 def update_table(conn, df, table_name):
     # Update the existing table with new records.
@@ -231,13 +257,15 @@ def update_table(conn, df, table_name):
     else:
         log.info(f"No new records to add to the {table_name} table")
 
+
 def table_exists(conn, table_name):
     # Check if the table already exists in the database
     cur = conn.cursor()
     cur.execute(f"SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{table_name}'")
-    if cur.fetchone()[0]==1 :
+    if cur.fetchone()[0] == 1:
         return True
     return False
+
 
 def job_exists(df, job):
     # Check if the job already exists in the dataframe
@@ -245,7 +273,9 @@ def job_exists(df, job):
         return False
     #return ((df['title'] == job['title']) & (df['company'] == job['company']) & (df['date'] == job['date'])).any()
     #The job exists if there's already a job in the database that has the same URL
-    return ((df['job_url'] == job['job_url']).any() | (((df['title'] == job['title']) & (df['company'] == job['company']) & (df['date'] == job['date'])).any()))
+    return ((df['job_url'] == job['job_url']).any() | (
+        ((df['title'] == job['title']) & (df['company'] == job['company']) & (df['date'] == job['date'])).any()))
+
 
 def get_jobcards(config):
     #Function to get the job cards from the search results page
@@ -254,10 +284,10 @@ def get_jobcards(config):
     total_url_request_count = 0
     for k in range(0, config['rounds']):
         for query in config['search_queries']:
-            keywords = quote(query['keywords']) # URL encode the keywords
-            location = quote(query['location']) # URL encode the location
-            for i in range (0, config['pages_to_scrape']):
-                url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keywords}&location={location}&f_TPR=&f_WT={query['f_WT']}&geoId=&f_TPR={config['timespan']}&start={25*i}"
+            keywords = quote(query['keywords'])  # URL encode the keywords
+            location = quote(query['location'])  # URL encode the location
+            for i in range(0, config['pages_to_scrape']):
+                url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keywords}&location={location}&f_TPR=&f_WT={query['f_WT']}&geoId=&f_TPR={config['timespan']}&start={25 * i}"
                 soup = get_with_retry(url, config)
                 total_url_request_count += 1
                 if soup:
@@ -265,7 +295,8 @@ def get_jobcards(config):
                     successful_url_request_count += 1
                     all_jobs += jobs
                     log.info(f"Finished scraping page: {url}")
-    log.info(f"{successful_url_request_count}/{total_url_request_count} - {int((successful_url_request_count / total_url_request_count) * 100)}% successful request rate")
+    log.info(
+        f"{successful_url_request_count}/{total_url_request_count} - {int((successful_url_request_count / total_url_request_count) * 100)}% successful request rate")
     log.info(f"Total job cards scraped: {len(all_jobs)}")
     all_jobs = remove_duplicates(all_jobs, config)
     log.info(f"Total job cards after removing duplicates: {len(all_jobs)}")
@@ -273,12 +304,13 @@ def get_jobcards(config):
     log.info(f"Total job cards after removing irrelevant jobs: {len(all_jobs)}")
     return all_jobs
 
+
 def find_new_jobs(all_jobs, conn, config):
     # From all_jobs, find the jobs that are not already in the database. Function checks both the jobs and filtered_jobs tables.
     jobs_tablename = config['jobs_tablename']
     filtered_jobs_tablename = config['filtered_jobs_tablename']
     jobs_db = pd.DataFrame()
-    filtered_jobs_db = pd.DataFrame()    
+    filtered_jobs_db = pd.DataFrame()
     if conn is not None:
         if table_exists(conn, jobs_tablename):
             query = f"SELECT * FROM {jobs_tablename}"
@@ -290,14 +322,16 @@ def find_new_jobs(all_jobs, conn, config):
     new_joblist = [job for job in all_jobs if not job_exists(jobs_db, job) and not job_exists(filtered_jobs_db, job)]
     return new_joblist
 
+
 def main(config_file):
     log.info("Start scraping...")
     start_time = tm.perf_counter()
     job_list = []
 
     config = load_config(config_file)
-    jobs_tablename = config['jobs_tablename'] # name of the table to store the "approved" jobs
-    filtered_jobs_tablename = config['filtered_jobs_tablename'] # name of the table to store the jobs that have been filtered out based on description keywords (so that in future they are not scraped again)
+    jobs_tablename = config['jobs_tablename']  # name of the table to store the "approved" jobs
+    filtered_jobs_tablename = config[
+        'filtered_jobs_tablename']  # name of the table to store the jobs that have been filtered out based on description keywords (so that in future they are not scraped again)
     #Scrape search results page and get job cards. This step might take a while based on the number of pages and search queries.
     all_jobs = get_jobcards(config)
     conn = create_connection(config)
@@ -335,15 +369,15 @@ def main(config_file):
         df['date_loaded'] = datetime.now()
         df_filtered['date_loaded'] = datetime.now()
         df['date_loaded'] = df['date_loaded'].astype(str)
-        df_filtered['date_loaded'] = df_filtered['date_loaded'].astype(str)        
-        
+        df_filtered['date_loaded'] = df_filtered['date_loaded'].astype(str)
+
         if conn is not None:
             #Update or Create the database table for the job list
             if table_exists(conn, jobs_tablename):
                 update_table(conn, df, jobs_tablename)
             else:
                 create_table(conn, df, jobs_tablename)
-                
+
             #Update or Create the database table for the filtered out jobs
             if table_exists(conn, filtered_jobs_tablename):
                 update_table(conn, df_filtered, filtered_jobs_tablename)
@@ -351,21 +385,56 @@ def main(config_file):
                 create_table(conn, df_filtered, filtered_jobs_tablename)
         else:
             log.error("Error! cannot create the database connection.")
-        
-        df.to_csv('/app/data/linkedin_jobs.csv', mode='a', index=False, encoding='utf-8')
-        df_filtered.to_csv('/app/data/linkedin_jobs_filtered.csv', mode='a', index=False, encoding='utf-8')
+
+        linkedin_job_csv_path = get_path("data", "linkedin_jobs.csv")
+        linkedin_jobs_filtered_csv_path = get_path("data", "linkedin_jobs_filtered.csv")
+
+        df.to_csv(linkedin_job_csv_path, mode='a', index=False, encoding='utf-8')
+        df_filtered.to_csv(linkedin_jobs_filtered_csv_path, mode='a', index=False, encoding='utf-8')
     else:
         log.info("No jobs found")
-    
+
     end_time = tm.perf_counter()
     log.info(f"Scraping finished in {end_time - start_time:.2f} seconds")
 
-if __name__ == "__main__":
-    successful = reset_vpn()
-    if successful:
-        config_file = '../data/config.json'  # default config file
-        if len(sys.argv) == 2:
-            config_file = sys.argv[1]
-        # main(config_file)
+
+def get_path(file_parent_dir, file_name):
+    # Get the directory of the current script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Determine the correct database path based on the environment
+    if os.path.exists('/.dockerenv'):
+        # Running inside Docker, join parent of script, parent of file and filename
+        # Ex: data is inside /home/userscraper/app/
+        return os.path.join(script_dir, file_parent_dir, os.path.basename(file_name))
     else:
-        log.error("Gluetun failed to reset, will skip scraping...")
+        # Running locally, so resolve the path relative to the current working directory
+        # Ex: data/ is alongside app/ in auto-job-scraper/
+        base_dir = os.path.dirname(script_dir) # Move one level up
+        return os.path.join(base_dir, file_name)
+
+
+if __name__ == "__main__":
+    # Initialize the argument parser
+    parser = argparse.ArgumentParser(description="Run the scraper with optional VPN reset.")
+
+    # Define the positional argument for the configuration file
+    parser.add_argument('config_file', nargs='?', default='config.json',
+                        help="Path to the configuration file (default: config.json).")
+
+    # Define the optional flag for resetting the VPN
+    parser.add_argument('-reset_vpn', action='store_true',
+                        help="Reset the VPN before running the scraper.")
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    # Handle VPN reset if the flag is provided
+    vpn_successful_reset = True
+    if args.reset_vpn:
+        vpn_successful_reset = reset_vpn()
+
+    # Proceed only if the VPN reset was successful or not required
+    if vpn_successful_reset:
+        main(args.config_file)
+    else:
+        log.error("Gluetun failed to reset, skipping scraping...")
