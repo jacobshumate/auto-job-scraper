@@ -138,15 +138,20 @@ def remove_irrelevant_jobs(joblist, config):
 
 def remove_irrelevant_jobs_by_decriptions(joblist, config):
     #Filter out jobs based on descriptions
-    new_joblist = [job for job in joblist if
-                   any(word.lower() in job['job_description'].lower() for word in config['desc_words_include'])]
+    new_joblist = [job for job in joblist if any(
+        word.lower() in job['job_description'].lower() for word in config['desc_words_include'])] \
+        if config['desc_words_include'] else joblist
     new_joblist = [job for job in new_joblist if not any(
-        word.lower() in job['job_description'].lower() for word in config['desc_words_exclude'])] if len(
-        config['desc_words_exclude']) > 0 else new_joblist
+        word.lower() in job['job_description'].lower() for word in config['desc_words_exclude'])] \
+        if config['desc_words_exclude'] else new_joblist
 
-    exclude_regex = re.compile('|'.join('(?:{0})'.format(x) for x in config['desc_words_exclude_regex']))
-    new_joblist = [job for job in new_joblist if not re.search(exclude_regex, job['job_description'])] if len(
-        config['desc_words_exclude_regex']) > 0 else new_joblist
+    if config['desc_words_include_regex']:
+        include_regexes = [re.compile(pattern, re.IGNORECASE) for pattern in config['desc_words_include_regex']]
+        new_joblist = [job for job in new_joblist if any(regex.search(job['job_description']) for regex in include_regexes)]
+
+    if config['desc_words_exclude_regex']:
+        exclude_regex = [re.compile(pattern, re.IGNORECASE) for pattern in config['desc_words_exclude_regex']]
+        new_joblist =[job for job in new_joblist if not any(regex.search(job['job_description']) for regex in exclude_regex)]
 
     return new_joblist
 
