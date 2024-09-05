@@ -1,4 +1,3 @@
-import logging
 
 from .logger import Logger
 import requests
@@ -51,7 +50,7 @@ def reset_vpn():
                      f"processed in {end_time - start_time:.2f} seconds")
             return True
         else:
-            logging.error(f"Failed to change to new VPN ip: {new_vpn_ip}, "
+            log.error(f"Failed to change to new VPN ip: {new_vpn_ip}, "
                           f"processed in {end_time - start_time:.2f} seconds")
     return False
 
