@@ -1,16 +1,21 @@
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 class LocalTimeFormatter(logging.Formatter):
     def formatTime(self, record, datefmt=None):
+        # Determine if daylight saving time is in effect
+        now = datetime.now()
+        is_dst = now.dst() != timedelta(0)
+
+        offset_hours = -6 if is_dst else -7
         # Get the current local time from the timestamp
-        local_time = datetime.fromtimestamp(record.created)
+        local_time = datetime.fromtimestamp(record.created, timezone(timedelta(hours=offset_hours)))
         if datefmt:
             # Format to include only milliseconds
             return local_time.strftime(datefmt)[:-3]
         else:
-            return local_time.isoformat()
+            return local_time.strftime('%m-%d %H:%M:%S,%f')
 
 class Logger:
     level_relations = {
