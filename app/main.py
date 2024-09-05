@@ -21,6 +21,7 @@ def load_config(file_name):
     with open(file_path) as f:
         return json.load(f)
 
+
 def get_path(file_name) -> str | bytes:
     # Get the directory of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +35,7 @@ def get_path(file_name) -> str | bytes:
         # Ex: data/ is alongside app/ in auto-job-scraper/
         base_dir = os.path.dirname(script_dir) # Move one level up
         return os.path.join(base_dir, file_name)
+
 
 def convert_date_format(date_string):
     """
@@ -53,20 +55,33 @@ def convert_date_format(date_string):
         log.error(f"Error: The date for job {date_string} - is not in the correct format.")
         return None
 
+
+def get_next_header(shuffled_headers, config):
+    if not shuffled_headers:
+        shuffled_headers = iter(random.sample(config['headers'], len(config['headers'])))
+    try:
+        return next(shuffled_headers), shuffled_headers
+    except StopIteration:
+        # Reshuffle and restart the iterator once exhausted
+        shuffled_headers = iter(random.sample(config['headers'], len(config['headers'])))
+        return next(shuffled_headers), shuffled_headers
+
+
 def get_jobcards(config):
     #Function to get the job cards from the search results page
     all_jobs = []
     successful_url_request_count = 0
     total_url_request_count = 0
+    shuffled_headers = None
     for k in range(0, config['rounds']):
-        headers = {'User-Agent': random.choice(config['headers'])}
+        header, shuffled_headers = get_next_header(shuffled_headers, config)
+        headers = {'User-Agent': header}
         successful_url_request_count_per_useragent = 0
         total_url_request_count_per_useragent = 0
         for query in config['search_queries']:
             keywords = quote(query['keywords'])  # URL encode the keywords
             location = quote(query['location'])  # URL encode the location
-            pages = random.sample(range(0, config['pages_to_scrape']), config['pages_to_scrape']) # Randomize the order of pages
-            for i in pages:
+            for i in range(0, config['pages_to_scrape']):
                 url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keywords}&location={location}&f_TPR=&f_WT={query['f_WT']}&geoId=&f_TPR={config['timespan']}&start={25 * i}"
                 job_data = get_with_retry(url, config, headers)
                 total_url_request_count += 1
@@ -88,6 +103,7 @@ def get_jobcards(config):
     all_jobs = JobProcessor.remove_irrelevant_jobs(all_jobs, config)
     log.info(f"Total job cards after removing irrelevant jobs: {len(all_jobs)}")
     return all_jobs
+
 
 def main(config_file):
     log.info("Start scraping...")
@@ -137,6 +153,7 @@ def main(config_file):
     end_time = tm.perf_counter()
     log.info(f"Scraping finished in {end_time - start_time:.2f} seconds")
 
+
 def add_job_descriptions(all_jobs, config):
     job_list = []
     missing_job_description_count = 0
@@ -162,6 +179,7 @@ def add_job_descriptions(all_jobs, config):
     log.info(f"Total jobs without descriptions: {missing_job_description_count}/{len(job_list)}")
     return job_list
 
+
 def create_update_job_tables(db_manager, df, df_filtered, jobs_tablename, filtered_jobs_tablename):
     if db_manager.connection is not None:
         #Update or Create the database table for the job list
@@ -177,6 +195,7 @@ def create_update_job_tables(db_manager, df, df_filtered, jobs_tablename, filter
             db_manager.create_table(df_filtered, filtered_jobs_tablename)
     else:
         log.error("Error! cannot create the database connection.")
+
 
 if __name__ == "__main__":
     # Initialize the argument parser
