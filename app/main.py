@@ -1,16 +1,17 @@
+import re
+import argparse
+import os
+import pandas as pd
+import random
+import json
+import time as tm
+from urllib.parse import quote
+from datetime import datetime, timedelta, time
 from components.db_manager import DB_Manager
 from components.logger import Logger
 from components.job_processor import JobProcessor
 from components.request_handler import get_with_retry
 from components.vpn_manager import reset_vpn
-import argparse
-import os
-import random
-import json
-import time as tm
-from datetime import datetime, timedelta, time
-import pandas as pd
-from urllib.parse import quote
 
 log = Logger('__main__')
 
@@ -39,8 +40,8 @@ def get_path(file_name) -> str | bytes:
 
 def convert_date_format(date_string):
     """
-    Converts a date string to a date object. 
-    
+    Converts a date string to a date object.
+
     Args:
         date_string (str): The date in string format.
 
@@ -128,7 +129,7 @@ def main(config_file):
     if len(all_jobs) > 0:
         job_list = add_job_descriptions(all_jobs, config)
         #Final check - removing jobs based on job description keywords words from the config file
-        jobs_to_add = JobProcessor.remove_irrelevant_jobs_by_decriptions(job_list, config)
+        jobs_to_add = JobProcessor.remove_irrelevant_jobs_by_descriptions(job_list, config)
         jobs_to_add = JobProcessor.remove_irrelevant_jobs_by_max_salary(jobs_to_add, config)
         log.info(f"Total jobs to add after filtering: {len(jobs_to_add)}")
         #Create a list for jobs removed based on job description keywords - they will be added to the filtered_jobs table
@@ -158,6 +159,7 @@ def add_job_descriptions(all_jobs, config):
     job_list = []
     missing_job_description_count = 0
     headers = {'User-Agent': config['headers'][0]}
+    salary_text_pattern = re.compile(JobProcessor.SALARY_TEXT_REGEX)
 
     for job in all_jobs:
         job_date = convert_date_format(job['date'])
@@ -169,7 +171,8 @@ def add_job_descriptions(all_jobs, config):
         job_desc_data = get_with_retry(job['job_url'], config, headers, 4, 3)
         if job_desc_data:
             job['job_description'] = JobProcessor.parse_job_description(job_desc_data)
-            job['min_salary'], job['max_salary'] = JobProcessor.parse_job_salary_range(job_desc_data)
+            job['min_salary'], job['max_salary'] = (
+                JobProcessor.parse_job_salary_range(job_desc_data, salary_text_pattern))
             missing_job_description_count += 1 if "Could not find Job Description" == job['job_description'] else 0
             language = JobProcessor.safe_detect(job['job_description'])
             if language not in config['languages']:
