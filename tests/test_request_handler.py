@@ -1,9 +1,5 @@
 import os
 import requests
-import sys
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../app')))
-
 from bs4 import BeautifulSoup
 from unittest.mock import patch, Mock
 from app.components import request_handler

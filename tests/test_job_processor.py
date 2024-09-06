@@ -1,11 +1,5 @@
-import os
 import re
-import sys
-
 import pytest
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../app')))
-
 from bs4 import BeautifulSoup
 from langdetect import LangDetectException
 from unittest.mock import patch

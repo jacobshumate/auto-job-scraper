@@ -1,10 +1,4 @@
-import os
-import sys
-
 import requests
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../app')))
-
 from unittest.mock import patch, Mock
 from app.components import vpn_manager
 
