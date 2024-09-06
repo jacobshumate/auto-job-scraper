@@ -125,5 +125,5 @@ class DB_Manager:
             return False
         #return ((df['title'] == job['title']) & (df['company'] == job['company']) & (df['date'] == job['date'])).any()
         #The job exists if there's already a job in the database that has the same URL
-        return ((df['job_url'] == job['job_url']).any() | (
+        return bool((df['job_url'] == job['job_url']).any() | (
             ((df['title'] == job['title']) & (df['company'] == job['company']) & (df['date'] == job['date'])).any()))
