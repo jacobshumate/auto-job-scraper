@@ -8,6 +8,9 @@ log = Logger('__main__')
 
 class JobProcessor:
 
+    SALARY_RANGE_REGEX = r'\$\s*(\d{1,3}(?:,\d{3})?(?:k)?)\s*(?:-|to)\s*\$\s*(\d{1,3}(?:,\d{3})?(?:k)?)'
+    SALARY_TEXT_REGEX = r'\$([\d,]+(?:\.\d{2})?)\s*(?:/yr)?'
+
     @staticmethod
     def parse_job(soup):
         # Parsing the job card info (title, company, location, date, job_url) from the beautiful soup object
@@ -71,19 +74,17 @@ class JobProcessor:
             return "Could not find Job Description"
 
     @staticmethod
-    def parse_job_salary_range(soup):
+    def parse_job_salary_range(soup, pattern):
         # Extract the salary text
         salary_data = soup.find('div', class_='salary compensation__salary')
         if salary_data:
             salary_text = salary_data.get_text(strip=True)
             if salary_text:
-                pattern = r'\$([\d,]+(?:\.\d{2})?)'
                 matches = re.findall(pattern, salary_text)
                 if matches:
                     min_salary = int(matches[0].replace(',', '').split('.')[0])
-                    max_salary = int(matches[1].replace(',', '').split('.')[0]) if len(matches) > 1 else None
-                    if min_salary and max_salary:
-                        return min_salary, max_salary
+                    max_salary = int(matches[1].replace(',', '').split('.')[0]) if len(matches) > 1 else 0
+                    return min_salary, max_salary
         return 0, 0
 
     @staticmethod
@@ -110,7 +111,7 @@ class JobProcessor:
         return new_joblist
 
     @staticmethod
-    def remove_irrelevant_jobs_by_decriptions(joblist, config):
+    def remove_irrelevant_jobs_by_descriptions(joblist, config):
         #Filter out jobs based on descriptions
         new_joblist = [job for job in joblist if any(
             word.lower() in job['job_description'].lower() for word in config['desc_words_include'])] \
@@ -138,8 +139,7 @@ class JobProcessor:
 
     @staticmethod
     def remove_irrelevant_jobs_by_max_salary(joblist, config):
-        pattern = (re.compile
-                   (r'\$\s*(\d{1,3}(?:,\d{3})?(?:k)?)\s*(?:-|to)\s*\$\s*(\d{1,3}(?:,\d{3})?(?:k)?)', re.IGNORECASE))
+        pattern = re.compile(JobProcessor.SALARY_RANGE_REGEX, re.IGNORECASE)
 
         # Filter joblist based on the logic
         filtered_joblist = [
