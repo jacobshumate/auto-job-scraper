@@ -7,7 +7,6 @@ from .request_handler import get_with_retry
 from urllib.parse import quote
 import random
 import re
-import time
 
 
 class JobProcessor:
