@@ -78,6 +78,7 @@ def start(config_file):
     log.info(f"Total new jobs found after comparing to the database: {len(all_jobs)}")
 
     if len(all_jobs) > 0:
+        # Process and save all jobs that fit filtering criteria
         process_jobs(all_jobs, config, db_manager)
     else:
         log.info("No jobs found")
