@@ -2,6 +2,7 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 
+
 class LocalTimeFormatter(logging.Formatter):
     def formatTime(self, record, datefmt=None):
         # Determine if daylight saving time is in effect
@@ -16,6 +17,7 @@ class LocalTimeFormatter(logging.Formatter):
             return local_time.strftime(datefmt)[:-3]
         else:
             return local_time.strftime('%m-%d %H:%M:%S,%f')
+
 
 class Logger:
     level_relations = {
