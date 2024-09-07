@@ -9,7 +9,7 @@ LOG_PATH=/home/scraperuser/app/data/log/main.log
 ERROR_LOG_PATH=/home/scraperuser/app/data/log/error.log
 
 # Get current timestamp
-CURRENT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+CURRENT_TIME=$(date +'%Y-%m-%d %H:%M:%S')
 
 # Check to see if Python script is already running, if it is, don't run and log
 if pidof -x python > /dev/null; then
