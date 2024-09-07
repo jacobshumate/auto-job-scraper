@@ -3,9 +3,9 @@ import pandas
 import sqlite3
 from sqlite3 import Error
 
-log = Logger('__main__')
 
 class DB_Manager:
+    log = Logger('__name__')
 
     def __init__(self):
         self.connection = None
@@ -14,9 +14,9 @@ class DB_Manager:
         # Create a database connection to a SQLite database
         try:
             self.connection = sqlite3.connect(db_path)  # creates a SQL database in the 'data' directory
-            log.info("Successfully connected to the database.")
+            self.log.info("Successfully connected to the database.")
         except Error as e:
-            log.error(f"Error thrown while attempting to connect to database, error: {e}")
+            self.log.error(f"Error thrown while attempting to connect to database, error: {e}")
             self.connection = None
         return self.connection
 
@@ -24,9 +24,9 @@ class DB_Manager:
         if self.connection:
             try:
                 self.connection.close()
-                log.info("Database connection closed.")
+                self.log.info("Database connection closed.")
             except sqlite3.Error as e:
-                log.error(f"Error closing the database connection: {e}")
+                self.log.error(f"Error closing the database connection: {e}")
 
     def create_table(self, df, table_name):
         ''''
@@ -76,7 +76,7 @@ class DB_Manager:
         # Commit the transaction
         self.connection.commit()
 
-        log.info(f"Created the {table_name} table and added {len(df)} records")
+        self.log.info(f"Created the {table_name} table and added {len(df)} records")
 
     def update_table(self, df, table_name):
         # Update the existing table with new records.
@@ -89,9 +89,9 @@ class DB_Manager:
         # If there are new records, append them to the existing table
         if len(df_new_records) > 0:
             df_new_records.to_sql(table_name, self.connection, if_exists='append', index=False)
-            log.info(f"Added {len(df_new_records)} new records to the {table_name} table")
+            self.log.info(f"Added {len(df_new_records)} new records to the {table_name} table")
         else:
-            log.info(f"No new records to add to the {table_name} table")
+            self.log.info(f"No new records to add to the {table_name} table")
 
     def table_exists(self, table_name):
         # Check if the table already exists in the database
@@ -102,7 +102,8 @@ class DB_Manager:
         return False
 
     def find_new_jobs(self, all_jobs, config):
-        # From all_jobs, find the jobs that are not already in the database. Function checks both the jobs and filtered_jobs tables.
+        # From all_jobs, find the jobs that are not already in the database. Function checks both the jobs and
+        # filtered_jobs tables.
         jobs_tablename = config['jobs_tablename']
         filtered_jobs_tablename = config['filtered_jobs_tablename']
         jobs_db = pandas.DataFrame()
@@ -123,7 +124,5 @@ class DB_Manager:
         # Check if the job already exists in the dataframe
         if df.empty:
             return False
-        #return ((df['title'] == job['title']) & (df['company'] == job['company']) & (df['date'] == job['date'])).any()
-        #The job exists if there's already a job in the database that has the same URL
         return bool((df['job_url'] == job['job_url']).any() | (
             ((df['title'] == job['title']) & (df['company'] == job['company']) & (df['date'] == job['date'])).any()))
