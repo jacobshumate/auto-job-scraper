@@ -2,7 +2,6 @@ from .logger import Logger
 import requests
 import time
 
-# Setup log
 log = Logger('__name__')
 
 
