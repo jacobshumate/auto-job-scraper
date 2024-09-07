@@ -1,15 +1,71 @@
 from itertools import groupby
 from langdetect import detect
+from datetime import datetime, time, timedelta
 from langdetect.lang_detect_exception import LangDetectException
 from .logger import Logger
+from .request_handler import get_with_retry
+from urllib.parse import quote
+import random
 import re
+import time
 
-log = Logger('__main__')
 
 class JobProcessor:
-
+    log = Logger('__name__')
     SALARY_RANGE_REGEX = r'\$\s*(\d{1,3}(?:,\d{3})?(?:k)?)\s*(?:-|to)\s*\$\s*(\d{1,3}(?:,\d{3})?(?:k)?)'
     SALARY_TEXT_REGEX = r'\$([\d,]+(?:\.\d{2})?)\s*(?:/yr)?'
+
+    @staticmethod
+    def get_jobcards(config):
+        #Function to get the job cards from the search results page
+        all_jobs = []
+        successful_url_request_count = 0
+        total_url_request_count = 0
+        shuffled_headers = None
+        for k in range(0, config['rounds']):
+            header, shuffled_headers = JobProcessor.get_next_header(shuffled_headers, config)
+            headers = {'User-Agent': header}
+            successful_url_request_count_per_useragent = 0
+            total_url_request_count_per_useragent = 0
+            for query in config['search_queries']:
+                keywords = quote(query['keywords'])  # URL encode the keywords
+                location = quote(query['location'])  # URL encode the location
+                for i in range(0, config['pages_to_scrape']):
+                    url = (f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keywords}"
+                           f"&location={location}&f_TPR=&f_WT={query['f_WT']}&geoId=&f_TPR={config['timespan']}&start="
+                           f"{25 * i}")
+                    job_data = get_with_retry(url, config, headers)
+                    total_url_request_count += 1
+                    total_url_request_count_per_useragent += 1
+                    if job_data:
+                        jobs = JobProcessor.parse_job(job_data)
+                        successful_url_request_count += 1
+                        successful_url_request_count_per_useragent += 1
+                        all_jobs += jobs
+                        JobProcessor.log.info(f"Finished scraping {url}")
+            JobProcessor.log.info(f"{successful_url_request_count_per_useragent}/{total_url_request_count_per_useragent} "
+                     f"- {int((successful_url_request_count_per_useragent / total_url_request_count_per_useragent)
+                              * 100)}% sucessful request rate for useragent: {headers}")
+        JobProcessor.log.info(
+            f"{successful_url_request_count}/{total_url_request_count} - "
+            f"{int((successful_url_request_count / total_url_request_count) * 100)}% successful request rate")
+        JobProcessor.log.info(f"Total job cards scraped: {len(all_jobs)}")
+        all_jobs = JobProcessor.remove_duplicates(all_jobs, config)
+        JobProcessor.log.info(f"Total job cards after removing duplicates: {len(all_jobs)}")
+        all_jobs = JobProcessor.remove_irrelevant_jobs(all_jobs, config)
+        JobProcessor.log.info(f"Total job cards after removing irrelevant jobs: {len(all_jobs)}")
+        return all_jobs
+
+    @staticmethod
+    def get_next_header(shuffled_headers, config):
+        if not shuffled_headers:
+            shuffled_headers = iter(random.sample(config['headers'], len(config['headers'])))
+        try:
+            return next(shuffled_headers), shuffled_headers
+        except StopIteration:
+            # Reshuffle and restart the iterator once exhausted
+            shuffled_headers = iter(random.sample(config['headers'], len(config['headers'])))
+            return next(shuffled_headers), shuffled_headers
 
     @staticmethod
     def parse_job(soup):
@@ -18,7 +74,7 @@ class JobProcessor:
         try:
             divs = soup.find_all('div', class_='base-search-card__info')
         except:
-            log.info("Empty page, no jobs found")
+            JobProcessor.log.info("Empty page, no jobs found")
             return joblist
         for item in divs:
             title = item.find('h3').text.strip()
@@ -51,6 +107,53 @@ class JobProcessor:
         return joblist
 
     @staticmethod
+    def add_job_descriptions(all_jobs, config):
+        job_list = []
+        missing_job_description_count = 0
+        headers = {'User-Agent': config['headers'][0]}
+        salary_text_pattern = re.compile(JobProcessor.SALARY_TEXT_REGEX)
+
+        for job in all_jobs:
+            job_date = JobProcessor.convert_date_format(job['date'])
+            job_date = datetime.combine(job_date, time())
+            #if job is older than a week, skip it
+            if job_date < datetime.now() - timedelta(days=config['days_to_scrape']):
+                continue
+            JobProcessor.log.info(f"Found new job: {job['title']} at {job['company']} {job['job_url']}")
+            job_desc_data = get_with_retry(job['job_url'], config, headers, 4, 3)
+            if job_desc_data:
+                job['job_description'] = JobProcessor.parse_job_description(job_desc_data)
+                job['min_salary'], job['max_salary'] = (
+                    JobProcessor.parse_job_salary_range(job_desc_data, salary_text_pattern))
+                missing_job_description_count += 1 if "Could not find Job Description" == job['job_description'] else 0
+                language = JobProcessor.safe_detect(job['job_description'])
+                if language not in config['languages']:
+                    JobProcessor.log.info(f"Job description language not supported: {language}")
+                    #continue
+                job_list.append(job)
+        JobProcessor.log.info(f"Total jobs without descriptions: {missing_job_description_count}/{len(job_list)}")
+        return job_list
+
+    @staticmethod
+    def convert_date_format(date_string):
+        """
+        Converts a date string to a date object.
+
+        Args:
+            date_string (str): The date in string format.
+
+        Returns:
+            date: The converted date object, or None if conversion failed.
+        """
+        date_format = "%Y-%m-%d"
+        try:
+            job_date = datetime.strptime(date_string, date_format).date()
+            return job_date
+        except ValueError:
+            JobProcessor.log.error(f"Error: The date for job {date_string} - is not in the correct format.")
+            return None
+
+    @staticmethod
     def parse_job_description(soup):
         div = soup.find('div', class_='description__text description__text--rich')
         if div:
@@ -70,7 +173,7 @@ class JobProcessor:
             text = text.replace('Show less', '').replace('Show more', '')
             return text
         else:
-            log.warning("FAILED to find Job Description")
+            JobProcessor.log.warning("FAILED to find Job Description")
             return "Could not find Job Description"
 
     @staticmethod
@@ -102,7 +205,8 @@ class JobProcessor:
         new_joblist = [job for job in new_joblist if
                        any(word.lower() in job['title'].lower() for word in config['title_include'])] if len(
             config['title_include']) > 0 else new_joblist
-        new_joblist = [job for job in new_joblist if JobProcessor.safe_detect(job['job_description']) in config['languages']] if len(
+        new_joblist = [job for job in new_joblist if
+                       JobProcessor.safe_detect(job['job_description']) in config['languages']] if len(
             config['languages']) > 0 else new_joblist
         new_joblist = [job for job in new_joblist if
                        not any(word.lower() in job['company'].lower() for word in config['company_exclude'])] if len(
@@ -122,11 +226,13 @@ class JobProcessor:
 
         if config['desc_words_include_regex']:
             include_regexes = [re.compile(pattern, re.IGNORECASE) for pattern in config['desc_words_include_regex']]
-            new_joblist = [job for job in new_joblist if any(regex.search(job['job_description']) for regex in include_regexes)]
+            new_joblist = [job for job in new_joblist if
+                           any(regex.search(job['job_description']) for regex in include_regexes)]
 
         if config['desc_words_exclude_regex']:
             exclude_regex = [re.compile(pattern, re.IGNORECASE) for pattern in config['desc_words_exclude_regex']]
-            new_joblist =[job for job in new_joblist if not any(regex.search(job['job_description']) for regex in exclude_regex)]
+            new_joblist = [job for job in new_joblist if
+                           not any(regex.search(job['job_description']) for regex in exclude_regex)]
 
         return new_joblist
 
