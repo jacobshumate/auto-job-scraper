@@ -1,10 +1,10 @@
-
 from .logger import Logger
 import requests
 import time
 
 # Setup log
-log = Logger('__main__')
+log = Logger('__name__')
+
 
 # Configuration
 GLUETUN_STATUS_URL = "http://127.0.0.1:8000/v1/openvpn/status"
