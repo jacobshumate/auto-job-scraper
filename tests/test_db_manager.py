@@ -17,15 +17,12 @@ def sample_df():
     return pd.DataFrame(data)
 
 
-@patch('sqlite3.connect')
+@patch('sqlite3.connect', return_value=MagicMock)
 def test_create_connection_success(mock_connect):
-    mock_connect.return_value = MagicMock()
     db_manager = DB_Manager()
 
-    # Act
     result = db_manager.create_connection('test_db.sqlite')
 
-    # Assert
     assert result is not None
     assert db_manager.connection is not None
     mock_connect.assert_called_once_with('test_db.sqlite')
@@ -35,10 +32,8 @@ def test_create_connection_success(mock_connect):
 def test_create_connection_failure(mock_connect):
     db_manager = DB_Manager()
 
-    # Act
     result = db_manager.create_connection('invalid_db.sqlite')
 
-    # Assert
     assert result is None
     assert db_manager.connection is None
     mock_connect.assert_called_once_with('invalid_db.sqlite')
@@ -50,10 +45,8 @@ def test_close_connection_success(mock_connection):
     db_manager = DB_Manager()
     db_manager.connection = mock_conn_instance
 
-    # Act
     db_manager.close()
 
-    # Assert
     mock_conn_instance.close.assert_called_once()
 
 
@@ -64,10 +57,8 @@ def test_close_connection_failure(mock_connection):
     db_manager = DB_Manager()
     db_manager.connection = mock_conn_instance
 
-    # Act
     db_manager.close()
 
-    # Assert
     mock_conn_instance.close.assert_called_once()
 
 
@@ -77,10 +68,8 @@ def test_create_table_success(mock_connection, sample_df):
     db_manager = DB_Manager()
     db_manager.connection = mock_connection
 
-    # Act
     db_manager.create_table(sample_df, 'jobs_table')
 
-    # Assert
     mock_cursor.execute.assert_called()
     mock_connection.commit.assert_called()
 
@@ -100,10 +89,10 @@ def test_update_table_with_new_records(sample_df):
     existing_df = pd.DataFrame(existing_data)
     db_manager.create_table(existing_df, 'jobs_table')
 
-    # Act: Update the table with new records
+    # Update the table with new records
     db_manager.update_table(sample_df, 'jobs_table')
 
-    # Assert: Check that the table has the expected records
+    # Check that the table has the expected records
     df_existing = pd.read_sql('SELECT * FROM jobs_table', db_manager.connection)
     assert len(df_existing) == 2  # Both records should now be in the table
     assert 'Data Scientist' in df_existing['title'].values  # Check the new record
@@ -122,7 +111,6 @@ def test_find_new_jobs(mock_connection, sample_df):
     with patch('pandas.read_sql', return_value=pd.DataFrame()):
         new_jobs = db_manager.find_new_jobs(sample_df.to_dict('records'), config)
 
-    # Assert
     assert len(new_jobs) == len(sample_df)
 
 
@@ -145,10 +133,8 @@ def test_job_exists_true(mock_connection, sample_df):
         'job_url': 'https://example.com/job1'
     }
 
-    # Act
     result = db_manager.job_exists(existing_df, job)
 
-    # Assert
     assert result is True
 
 
@@ -171,8 +157,6 @@ def test_job_exists_false(mock_connection, sample_df):
         'job_url': 'https://example.com/job1'
     }
 
-    # Act
     result = db_manager.job_exists(existing_df, job)
 
-    # Assert
     assert result is False
