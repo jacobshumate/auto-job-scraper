@@ -2,6 +2,7 @@ import re
 import pytest
 from bs4 import BeautifulSoup
 from langdetect import LangDetectException
+from datetime import datetime
 from unittest.mock import patch
 from app.components.job_processor import JobProcessor
 
@@ -31,6 +32,7 @@ def joblist_with_duplicates(joblist):
 @pytest.fixture
 def config():
     return {
+        'headers': ['Mozilla/5.0', 'Chrome/89.0', "Safari/605"],
         'desc_words_include': [],
         'desc_words_exclude': [],
         'desc_words_include_regex': [r'\bPython\b', r'\bJava\b'],
@@ -39,7 +41,11 @@ def config():
         'title_exclude': ['webworks'],
         'company_exclude': [],
         'max_salary': 80000,
-        'languages': ['en']}
+        'languages': ['en'],
+        'rounds': 1,
+        'search_queries': [{'keywords': 'Software Engineer', 'location': 'Denver', 'f_WT': '1'}],
+        'pages_to_scrape': 2,
+        'timespan': 'r86400'}
 
 
 @pytest.fixture
@@ -87,6 +93,113 @@ def sample_job_salary_html():
         $100,000.00/yr - $150,000.00/yr
     </div>
     """
+
+
+@patch('app.components.job_processor.JobProcessor.remove_irrelevant_jobs')
+@patch('app.components.job_processor.JobProcessor.remove_duplicates')
+@patch('app.components.job_processor.JobProcessor.parse_job')
+@patch('app.components.job_processor.get_with_retry', return_value=sample_job_html)
+@patch('app.components.job_processor.JobProcessor.get_next_header', return_value=('Mozilla/5.0', iter(['Mozilla/5.0'])))
+@patch('app.components.job_processor.JobProcessor.log')
+def test_get_jobcards_success(mock_log, mock_get_next_header, mock_get_with_retry, mock_parse_job,
+                              mock_remove_duplicates, mock_remove_irrelevant_jobs, config):
+    # Arrange: Mock job parsing
+    job = [{'title': 'Software Engineer', 'company': 'TechCorp', 'location': 'Denver'}]
+    mock_parse_job.return_value = job
+
+    # Arrange: Mock the removal of duplicates and irrelevant jobs
+    mock_remove_duplicates.return_value = job
+    mock_remove_irrelevant_jobs.return_value = job
+
+    # Act: Call the get_jobcards function
+    result = JobProcessor.get_jobcards(config)
+
+    # Assert: Check if the result contains job cards
+    assert len(result) == 1
+    assert result[0]['title'] == 'Software Engineer'
+
+    # Assert: Check if methods were called the expected number of times
+    assert mock_get_with_retry.call_count == config['pages_to_scrape'] * len(config['search_queries'])
+    mock_parse_job.assert_called()
+    mock_remove_duplicates.assert_called_once()
+    mock_remove_irrelevant_jobs.assert_called_once()
+
+    # Assert: Check if logging was done
+    mock_log.info.assert_any_call('Total job cards scraped: 2')
+    mock_log.info.assert_any_call('Total job cards after removing duplicates: 1')
+    mock_log.info.assert_any_call('Total job cards after removing irrelevant jobs: 1')
+
+
+@patch('app.components.job_processor.get_with_retry', return_value=None)  # Simulate no job data
+@patch('app.components.job_processor.JobProcessor.get_next_header',
+       return_value=('Mozilla/5.0', iter(['Mozilla/5.0'])))
+@patch('app.components.job_processor.JobProcessor.log')
+def test_get_jobcards_no_jobs(mock_log, mock_get_next_header, mock_get_with_retry, config):
+    # Act: Call the get_jobcards function with no jobs returned
+    result = JobProcessor.get_jobcards(config)
+
+    # Assert: Check that no jobs were added
+    assert len(result) == 0
+
+    # Assert: Check that the log mentions no jobs
+    mock_log.info.assert_any_call('Total job cards scraped: 0')
+    mock_log.info.assert_any_call('Total job cards after removing duplicates: 0')
+    mock_log.info.assert_any_call('Total job cards after removing irrelevant jobs: 0')
+
+
+@patch('app.components.job_processor.get_with_retry')
+@patch('app.components.job_processor.JobProcessor.get_next_header', return_value=('Mozilla/5.0', iter(['Mozilla/5.0'])))
+@patch('app.components.job_processor.JobProcessor.remove_duplicates', return_value=[])
+@patch('app.components.job_processor.JobProcessor.remove_irrelevant_jobs', return_value=[])
+@patch('app.components.job_processor.JobProcessor.log')
+def test_get_jobcards_all_irrelevant_jobs(mock_log, mock_remove_irrelevant_jobs, mock_remove_duplicates,
+                                          mock_get_next_header, mock_get_with_retry, config):
+    # Arrange: Mock job data with jobs being parsed
+    mock_get_with_retry.return_value = sample_job_html
+    mock_remove_irrelevant_jobs.return_value = []  # All jobs are irrelevant
+
+    # Act: Call the get_jobcards function
+    result = JobProcessor.get_jobcards(config)
+
+    # Assert: Check that no jobs were added after filtering
+    assert len(result) == 0
+
+    # Assert: Check that the log mentions no jobs after filtering
+    mock_log.info.assert_any_call('Total job cards after removing irrelevant jobs: 0')
+
+
+# Test for get_next_header with an empty shuffled_headers
+def test_get_next_header_empty(config):
+    # Act
+    next_header, shuffled_headers = JobProcessor.get_next_header([], config)
+
+    # Assert
+    assert next_header in config["headers"]
+    assert len(list(shuffled_headers)) == 2  # One element was consumed
+
+
+# Test for get_next_header with existing shuffled_headers
+def test_get_next_header_not_empty(config):
+    shuffled_headers = iter(config["headers"])
+
+    # Act
+    next_header, new_shuffled_headers = JobProcessor.get_next_header(shuffled_headers, config)
+
+    # Assert
+    assert next_header == "Mozilla/5.0"
+    assert list(new_shuffled_headers) == ["Chrome/89.0", "Safari/605"]
+
+
+# Test for get_next_header reshuffling when the iterator is exhausted
+def test_get_next_header_reshuffle(config):
+    shuffled_headers = iter([])
+
+    # Act
+    next_header, new_shuffled_headers = JobProcessor.get_next_header(shuffled_headers, config)
+
+    # Assert
+    assert next_header in config["headers"]
+    assert len(list(new_shuffled_headers)) == 2  # Two elements left after one consumed
 
 
 def test_parse_job_success(sample_job_html):
@@ -154,6 +267,25 @@ def test_parse_job_missing_fields():
     assert job['rejected'] == 0
     assert job['min_salary'] == 0
     assert job['max_salary'] == 0
+
+
+# Test for convert_date_format
+def test_convert_date_format_valid():
+    # Act
+    result = JobProcessor.convert_date_format("2023-08-25")
+
+    # Assert
+    expected_date = datetime(2023, 8, 25).date()
+    assert result == expected_date
+
+
+def test_convert_date_format_invalid(caplog):
+    # Act
+    result = JobProcessor.convert_date_format("invalid-date")
+
+    # Assert
+    assert result is None
+    assert "Error: The date for job invalid-date - is not in the correct format." in caplog.text
 
 
 def test_parse_job_description(sample_job_description_html):
