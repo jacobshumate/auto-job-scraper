@@ -4,7 +4,8 @@ import random
 import requests
 import time
 
-log = Logger('__main__')
+log = Logger('__name__')
+
 
 def get_with_retry(url, config, headers=None, max_retries=5, delay=4):
     # Get the URL with retries and delay
@@ -21,7 +22,7 @@ def get_with_retry(url, config, headers=None, max_retries=5, delay=4):
                 continue
             else:
                 response.raise_for_status()
-                sleep_time = random.uniform(1, 3) # Sleep for a random time between 1 and 3 seconds
+                sleep_time = random.uniform(1, 3)  # Sleep for a random time between 1 and 3 seconds
                 log.info(f"Sleeping for {sleep_time:.2f}s")
                 time.sleep(sleep_time)
                 return BeautifulSoup(response.content, 'html.parser')
@@ -33,4 +34,3 @@ def get_with_retry(url, config, headers=None, max_retries=5, delay=4):
             log.error(f"An error occurred while retrieving {url}, error: {e}")
             break
     return None
-
