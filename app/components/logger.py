@@ -16,7 +16,7 @@ class LocalTimeFormatter(logging.Formatter):
             # Format to include only milliseconds
             return local_time.strftime(datefmt)[:-3]
         else:
-            return local_time.strftime('%m-%d %H:%M:%S,%f')
+            return local_time.strftime('%Y-%m-%d %H:%M:%S,%f')
 
 
 class Logger:
@@ -34,7 +34,7 @@ class Logger:
             self.logger.setLevel(self.level_relations.get(level))
 
             handler = logging.StreamHandler(sys.stdout)
-            formatter = LocalTimeFormatter(fmt, datefmt='%m-%d %H:%M:%S,%f')
+            formatter = LocalTimeFormatter(fmt, datefmt='%Y-%m-%d %H:%M:%S,%f')
             handler.setFormatter(formatter)
 
             self.logger.addHandler(handler)
