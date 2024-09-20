@@ -12,12 +12,7 @@ GLUETUN_PUBLIC_IP = "/v1/publicip/ip"
 STATUS = "status"
 STATUS_RUNNING = "running"
 STATUS_STOPPED = "stopped"
-IP_INFO_URLS = [ # List of urls for getting ips
-    "https://ipinfo.io",
-    "https://api.ipify.org?format=json",
-    "https://ifconfig.co/json"
-]
-IP = "ip"
+IP = "public_ip"
 TIMEOUT = 300  # Total time to wait (in seconds)
 CHECK_INTERVAL = 5  # Initial interval between checks (in seconds)
 INITIAL_DELAY = 15
@@ -89,16 +84,16 @@ def restart_gluetun_service():
 
 def get_vpn_ip(check_interval=CHECK_INTERVAL):
     """Get current VPN ip"""
-    for url in IP_INFO_URLS:
-        response_json = get_json(url, timeout=10)
-        if not response_json:
-            log.info(f"VPN IP not ready. Retrying in {check_interval} seconds...")
-            time.sleep(check_interval)
-            check_interval = min(check_interval * 2, 60) # Exponential backoff, max 60 seconds
-            continue
-        ip = response_json.get(IP)
-        if ip:
-            return ip
+    for attempt in range(3):
+        response_json = get_json(LOCAL + GLUETUN_PUBLIC_IP, timeout=10)
+        if response_json:
+            ip = response_json.get(IP)
+            if ip:
+                return ip
+        log.info(f"VPN IP not ready. Retrying in {check_interval} seconds...")
+        time.sleep(check_interval)
+        check_interval = min(check_interval * 2, 60) # Exponential backoff, max 60 seconds
+        continue
     return None
 
 
