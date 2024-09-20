@@ -20,7 +20,7 @@ USER root
 
 # Install necessary packages and clean up
 RUN apt-get update && \
-    apt-get -y install cron dos2unix wget && \
+    apt-get -y install cron dos2unix && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
