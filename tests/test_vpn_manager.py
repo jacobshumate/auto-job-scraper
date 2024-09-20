@@ -1,16 +1,11 @@
 
-from unittest.mock import patch, Mock
+from unittest.mock import patch
 from app.components import vpn_manager
-from app.components import request_handler
 
 # Sample constants for testing
-IP = 'ip'
-IP_INFO_URLS = [
-    "https://ipinfo.io",
-    "https://api.ipify.org?format=json",
-    "https://ifconfig.co/json"
-]
+IP = "public_ip"
 GLUETUN_STATUS_URL = "http://127.0.0.1:8000/v1/openvpn/status"
+GLUETUN_PUBLIC_IP = 'http://127.0.0.1:8000/v1/publicip/ip'
 TIMEOUT = 60
 CHECK_INTERVAL = 5
 INITIAL_DELAY = 15
@@ -124,7 +119,7 @@ def test_restart_gluetun_service(mock_log_info, mock_get_json):
 def test_get_vpn_ip_success(mock_get_json):
     result = vpn_manager.get_vpn_ip()
 
-    mock_get_json.assert_called_once_with(IP_INFO_URLS[0], timeout=10)
+    mock_get_json.assert_called_once_with(GLUETUN_PUBLIC_IP, timeout=10)
     assert result == '123.45.67.89'
 
 
@@ -134,7 +129,7 @@ def test_get_vpn_ip_fail(mock_sleep, mock_get_json):
     result = vpn_manager.get_vpn_ip()
 
     assert result is None
-    assert mock_get_json.call_count == len(IP_INFO_URLS)
+    assert mock_get_json.call_count == 3
     mock_sleep.assert_called()  # Ensure it tried to sleep after failure
 
 
