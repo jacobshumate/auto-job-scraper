@@ -48,6 +48,7 @@ services:
       - BLOCK_OUTSIDE_DNS=1
       - DNS_OVER_TLS=on
       - RANDOM_SERVER=on
+      - UPDATER_PERIOD=24h
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://${HEALTH_SERVER_ADDRESS}"]
