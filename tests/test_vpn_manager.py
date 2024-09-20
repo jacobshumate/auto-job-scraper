@@ -1,6 +1,7 @@
-import requests
+
 from unittest.mock import patch, Mock
 from app.components import vpn_manager
+from app.components import request_handler
 
 # Sample constants for testing
 IP = 'ip'
@@ -94,121 +95,59 @@ def test_wait_for_gluetun_to_be_ready_timeout(mock_log, mock_sleep, mock_is_runn
     mock_log.error.assert_called_with("Timeout reached. Gluetun service did not start.")
 
 
-@patch('app.components.vpn_manager.make_request', return_value={'status': 'running'}) # Simulate a successful response where the service is running
-def test_is_gluetun_service_running_success(mock_make_request):
+@patch('app.components.vpn_manager.get_json', return_value={'status': 'running'}) # Simulate a successful response where the service is running
+def test_is_gluetun_service_running_success(mock_get_json):
     result = vpn_manager.is_gluetun_service_running()
 
-    mock_make_request.assert_called_once_with(GLUETUN_STATUS_URL)
+    mock_get_json.assert_called_once_with(GLUETUN_STATUS_URL)
     assert result is True
 
 
-@patch('app.components.vpn_manager.make_request', return_value={'status': 'stopped'}) # Simulate a response where the service is not running
-def test_is_gluetun_service_running_failure(mock_make_request):
+@patch('app.components.vpn_manager.get_json', return_value={'status': 'stopped'}) # Simulate a response where the service is not running
+def test_is_gluetun_service_running_failure(mock_get_json):
     result = vpn_manager.is_gluetun_service_running()
 
-    mock_make_request.assert_called_once_with(GLUETUN_STATUS_URL)
+    mock_get_json.assert_called_once_with(GLUETUN_STATUS_URL)
     assert result is False
 
 
-@patch('app.components.vpn_manager.make_request', return_value={'outcome': 'success'}) # Simulate a successful PUT request
+@patch('app.components.vpn_manager.get_json', return_value={'outcome': 'success'}) # Simulate a successful PUT request
 @patch('app.components.vpn_manager.log.info')
-def test_restart_gluetun_service(mock_log_info, mock_make_request):
+def test_restart_gluetun_service(mock_log_info, mock_get_json):
     vpn_manager.restart_gluetun_service()
 
-    mock_make_request.assert_called_once_with(GLUETUN_STATUS_URL, method='PUT', data='{"status":"stopped"}')
+    mock_get_json.assert_called_once_with(GLUETUN_STATUS_URL, method='PUT', data='{"status":"stopped"}')
     mock_log_info.assert_called_once_with('Gluetun status: success')
 
 
-@patch('app.components.vpn_manager.make_request', return_value={IP: '123.45.67.89'})
-def test_get_vpn_ip_success(mock_make_request):
+@patch('app.components.vpn_manager.get_json', return_value={IP: '123.45.67.89'})
+def test_get_vpn_ip_success(mock_get_json):
     result = vpn_manager.get_vpn_ip()
 
-    mock_make_request.assert_called_once_with(IP_INFO_URLS[0], timeout=10)
+    mock_get_json.assert_called_once_with(IP_INFO_URLS[0], timeout=10)
     assert result == '123.45.67.89'
 
 
-@patch('app.components.vpn_manager.make_request', return_value=None) # Simulate a failed request
+@patch('app.components.vpn_manager.get_json', return_value=None) # Simulate a failed request
 @patch('time.sleep')
-def test_get_vpn_ip_fail(mock_sleep, mock_make_request):
+def test_get_vpn_ip_fail(mock_sleep, mock_get_json):
     result = vpn_manager.get_vpn_ip()
 
     assert result is None
-    assert mock_make_request.call_count == len(IP_INFO_URLS)
+    assert mock_get_json.call_count == len(IP_INFO_URLS)
     mock_sleep.assert_called()  # Ensure it tried to sleep after failure
 
 
-@patch('app.components.vpn_manager.make_request', side_effect=[None, None, {IP: '123.45.67.89'}]) # Simulate multiple failures, then a successful response
+@patch('app.components.vpn_manager.get_json', side_effect=[None, None, {IP: '123.45.67.89'}]) # Simulate multiple failures, then a successful response
 @patch('time.sleep')
-def test_get_vpn_ip_exponential_backoff(mock_sleep, mock_make_request):
+def test_get_vpn_ip_exponential_backoff(mock_sleep, mock_get_json):
     result = vpn_manager.get_vpn_ip()
 
     assert result == '123.45.67.89'
-    assert mock_make_request.call_count == 3
+    assert mock_get_json.call_count == 3
     assert mock_sleep.call_count == 2
     mock_sleep.assert_any_call(5)
     mock_sleep.assert_any_call(10)
-
-
-@patch('requests.get')
-def test_make_request_get_success(mock_get):
-    response_data = {"key": "value"}
-    mock_response = Mock()
-    mock_response.json.return_value = response_data
-    mock_get.return_value = mock_response
-
-    url = "http://example.com/api"
-
-    result = vpn_manager.make_request(url)
-
-    mock_get.assert_called_once_with(url, timeout=5)
-    assert result == response_data
-
-
-@patch('requests.put')
-def test_make_request_put_success(mock_put):
-    response_data = {"key": "value"}
-    mock_response = Mock()
-    mock_response.json.return_value = response_data
-    mock_put.return_value = mock_response
-
-    url = "http://example.com/api"
-    data = {"data_key": "data_value"}
-
-    result = vpn_manager.make_request(url, method="PUT", data=data)
-
-    mock_put.assert_called_once_with(url, data=data, timeout=5)
-    assert result == response_data
-
-
-@patch('requests.get')
-def test_make_request_get_failure(mock_get):
-    mock_get.side_effect = requests.RequestException("Connection error")
-
-    url = "http://example.com/api"
-
-    result = vpn_manager.make_request(url)
-
-    mock_get.assert_called_once_with(url, timeout=5)
-    assert result is None
-
-
-@patch('requests.put')
-def test_make_request_put_failure(mock_put):
-    mock_put.side_effect = requests.RequestException("Connection error")
-
-    url = "http://example.com/api"
-    data = {"data_key": "data_value"}
-
-    result = vpn_manager.make_request(url, method="PUT", data=data)
-
-    mock_put.assert_called_once_with(url, data=data, timeout=5)
-    assert result is None
-
-
-def test_make_request_unsupported_method():
-    result = vpn_manager.make_request("http://example.com/api", method="POST")
-
-    assert result is None
 
 
 def test_check_status():

@@ -1,12 +1,14 @@
 from .logger import Logger
-import requests
+from .request_handler import get_json
 import time
 
 log = Logger('__name__')
 
 
 # Configuration
-GLUETUN_STATUS_URL = "http://127.0.0.1:8000/v1/openvpn/status"
+LOCAL = "http://127.0.0.1:8000"
+GLUETUN_STATUS_URL = "/v1/openvpn/status"
+GLUETUN_PUBLIC_IP = "/v1/publicip/ip"
 STATUS = "status"
 STATUS_RUNNING = "running"
 STATUS_STOPPED = "stopped"
@@ -74,21 +76,21 @@ def wait_for_gluetun_to_be_ready(timeout=TIMEOUT, check_interval=CHECK_INTERVAL)
 
 def is_gluetun_service_running():
     """Check if Gluetun service is running."""
-    response_json = make_request(GLUETUN_STATUS_URL)
+    response_json = get_json(LOCAL + GLUETUN_STATUS_URL)
     return check_status(response_json, STATUS_RUNNING)
 
 
 def restart_gluetun_service():
     """Restart the Gluetun service."""
     data = '{"status":"stopped"}'
-    response_json = make_request(GLUETUN_STATUS_URL, method='PUT', data=data)
+    response_json = get_json(LOCAL + GLUETUN_STATUS_URL, method='PUT', data=data)
     log.info(f"Gluetun status: {response_json.get("outcome")}")
 
 
 def get_vpn_ip(check_interval=CHECK_INTERVAL):
     """Get current VPN ip"""
     for url in IP_INFO_URLS:
-        response_json = make_request(url, timeout=10)
+        response_json = get_json(url, timeout=10)
         if not response_json:
             log.info(f"VPN IP not ready. Retrying in {check_interval} seconds...")
             time.sleep(check_interval)
@@ -98,32 +100,6 @@ def get_vpn_ip(check_interval=CHECK_INTERVAL):
         if ip:
             return ip
     return None
-
-
-def make_request(url, method='GET', data=None, timeout=5):
-    """
-    Helper function to make an HTTP request and handle the response.
-
-    :param url: The URL to send the request to.
-    :param method: The HTTP method ('GET' or 'PUT').
-    :param data: The data to be sent in the request body (for 'PUT' method).
-    :param timeout: The timeout for the request.
-    :return: The parsed JSON response or None if there was an error.
-    """
-    try:
-        match method:
-            case "GET":
-                response = requests.get(url, timeout=timeout)
-            case "PUT":
-                response = requests.put(url, data=data, timeout=timeout)
-            case _:
-                log.error(f"Unsupported HTTP method: {method}")
-                return None
-        response.raise_for_status()  # Raise an exception for 4xx/5xx errors
-        return response.json()
-    except requests.RequestException as e:
-        log.error(f"{method} {url} failed: {e}")
-        return None
 
 
 def check_status(response_json, expected_status):
