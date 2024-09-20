@@ -1,9 +1,21 @@
 from .logger import Logger
+import json
 import random
 import requests
 import time
 
 log = Logger('__name__')
+
+
+def get_json(url, headers=None, data=None, timeout=5):
+    try:
+        response = make_request(url, headers=headers, data=data, timeout=timeout)
+        if response:
+            return response.json()  # Try to parse the response as JSON
+        return None
+    except json.JSONDecodeError as e:
+        log.error(f"JSON decode error for {url}: {e}")
+        return None
 
 
 def make_request(url, method='GET', headers=None, data=None, timeout=5):
