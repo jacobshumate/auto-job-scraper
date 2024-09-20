@@ -23,7 +23,7 @@ def get_with_retry(url, config, headers=None, max_retries=5, delay=4):
             else:
                 response.raise_for_status()
                 sleep_time = random.uniform(1, 3)  # Sleep for a random time between 1 and 3 seconds
-                log.info(f"Sleeping for {sleep_time:.2f}s")
+                log.debug(f"Sleeping for {sleep_time:.2f}s")
                 time.sleep(sleep_time)
                 return BeautifulSoup(response.content, 'html.parser')
         except requests.exceptions.RequestException as e:
