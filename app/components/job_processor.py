@@ -41,7 +41,7 @@ class JobProcessor:
                         successful_url_request_count += 1
                         successful_url_request_count_per_useragent += 1
                         all_jobs += jobs
-                        JobProcessor.log.info(f"Finished scraping {url}")
+                        JobProcessor.log.debug(f"Finished scraping {url}")
             JobProcessor.log.info(f"{successful_url_request_count_per_useragent}/{total_url_request_count_per_useragent} "
                      f"- {int((successful_url_request_count_per_useragent / total_url_request_count_per_useragent)
                               * 100)}% sucessful request rate for useragent: {headers}")
