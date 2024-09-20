@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 from itertools import groupby
 from langdetect import detect
 from datetime import datetime, time, timedelta
@@ -33,7 +34,8 @@ class JobProcessor:
                     url = (f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keywords}"
                            f"&location={location}&f_TPR=&f_WT={query['f_WT']}&geoId=&f_TPR={config['timespan']}&start="
                            f"{25 * i}")
-                    job_data = get_with_retry(url, config, headers)
+                    response = get_with_retry(url, headers)
+                    job_data = JobProcessor.convert_response_to_beautifulsoup(response)
                     total_url_request_count += 1
                     total_url_request_count_per_useragent += 1
                     if job_data:
@@ -54,6 +56,12 @@ class JobProcessor:
         all_jobs = JobProcessor.remove_irrelevant_jobs(all_jobs, config)
         JobProcessor.log.info(f"Total job cards after removing irrelevant jobs: {len(all_jobs)}")
         return all_jobs
+
+    @staticmethod
+    def convert_response_to_beautifulsoup(response):
+        if not response:
+            return None
+        return BeautifulSoup(response.content, 'html.parser')
 
     @staticmethod
     def get_next_header(shuffled_headers, config):
@@ -119,7 +127,7 @@ class JobProcessor:
             if job_date < datetime.now() - timedelta(days=config['days_to_scrape']):
                 continue
             JobProcessor.log.info(f"Found new job: {job['title']} at {job['company']} {job['job_url']}")
-            job_desc_data = get_with_retry(job['job_url'], config, headers, 4, 3)
+            job_desc_data = get_with_retry(job['job_url'], headers, 4, 3)
             if job_desc_data:
                 job['job_description'] = JobProcessor.parse_job_description(job_desc_data)
                 job['min_salary'], job['max_salary'] = (

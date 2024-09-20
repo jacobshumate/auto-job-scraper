@@ -3,7 +3,7 @@ import pytest
 from bs4 import BeautifulSoup
 from langdetect import LangDetectException
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from app.components.job_processor import JobProcessor
 
 
@@ -98,7 +98,7 @@ def sample_job_salary_html():
 @patch('app.components.job_processor.JobProcessor.remove_irrelevant_jobs')
 @patch('app.components.job_processor.JobProcessor.remove_duplicates')
 @patch('app.components.job_processor.JobProcessor.parse_job')
-@patch('app.components.job_processor.get_with_retry', return_value=sample_job_html)
+@patch('app.components.job_processor.JobProcessor.convert_response_to_beautifulsoup', return_value=sample_job_html)
 @patch('app.components.job_processor.JobProcessor.get_next_header', return_value=('Mozilla/5.0', iter(['Mozilla/5.0'])))
 @patch('app.components.job_processor.JobProcessor.log')
 def test_get_jobcards_success(mock_log, mock_get_next_header, mock_get_with_retry, mock_parse_job,
@@ -142,7 +142,7 @@ def test_get_jobcards_no_jobs(mock_log, mock_get_next_header, mock_get_with_retr
     mock_log.info.assert_any_call('Total job cards after removing irrelevant jobs: 0')
 
 
-@patch('app.components.job_processor.get_with_retry')
+@patch('app.components.job_processor.JobProcessor.convert_response_to_beautifulsoup')
 @patch('app.components.job_processor.JobProcessor.get_next_header',
        return_value=('Mozilla/5.0', iter(['Mozilla/5.0'])))
 @patch('app.components.job_processor.JobProcessor.remove_duplicates', return_value=[])
@@ -161,6 +161,31 @@ def test_get_jobcards_all_irrelevant_jobs(mock_log, mock_remove_irrelevant_jobs,
 
     # Check that the log mentions no jobs after filtering
     mock_log.info.assert_any_call('Total job cards after removing irrelevant jobs: 0')
+
+
+def test_convert_response_to_beautifulsoup_valid():
+    mock_response = Mock()
+    mock_response.content = b"<html><body>Success</body></html>"
+
+    result = JobProcessor.convert_response_to_beautifulsoup(mock_response)
+
+    assert isinstance(result, BeautifulSoup)
+    assert result.body.get_text() == "Success"
+
+def test_convert_response_to_beautifulsoup_none():
+    result = JobProcessor.convert_response_to_beautifulsoup(None)
+
+    assert result is None
+
+
+def test_convert_response_to_beautifulsoup_empty_content():
+    mock_response = Mock()
+    mock_response.content = b""
+
+    result = JobProcessor.convert_response_to_beautifulsoup(mock_response)
+
+    assert isinstance(result, BeautifulSoup)
+    assert result.get_text() == ""  # Should return an empty string
 
 
 def test_get_next_header_empty(config):
