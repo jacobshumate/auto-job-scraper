@@ -127,7 +127,8 @@ class JobProcessor:
             if job_date < datetime.now() - timedelta(days=config['days_to_scrape']):
                 continue
             JobProcessor.log.info(f"Found new job: {job['title']} at {job['company']} {job['job_url']}")
-            job_desc_data = get_with_retry(job['job_url'], headers, 4, 3)
+            response = get_with_retry(job['job_url'], headers, 4, 3)
+            job_desc_data = JobProcessor.convert_response_to_beautifulsoup(response)
             if job_desc_data:
                 job['job_description'] = JobProcessor.parse_job_description(job_desc_data)
                 job['min_salary'], job['max_salary'] = (
