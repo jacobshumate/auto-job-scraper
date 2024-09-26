@@ -6,17 +6,11 @@ import time
 
 log = Logger('__name__')
 
+MAX_RETRIES = 5
+DELAY = 3
+
 
 def make_request(url, method='GET', headers=None, data=None, timeout=5):
-    """
-    Helper function to make an HTTP request and handle the response.
-    :param url: The URL to send the request to.
-    :param method: The HTTP method ('GET' or 'PUT').
-    :param headers:
-    :param data: The data to be sent in the request body (for 'PUT' method).
-    :param timeout: The timeout for the request.
-    :return: The parsed JSON response or None if there was an error.
-    """
     try:
         # Use a dictionary to map HTTP methods to requests functions
         methods = {
@@ -49,12 +43,12 @@ def get_json(url, method='GET', headers=None, data=None, timeout=5):
     return None
 
 
-def get_with_retry(url, headers=None, max_retries=5, delay=4):
+def get_with_retry(url, headers=None, max_retries=MAX_RETRIES, delay=DELAY):
     # Get the URL with retries and delay
     for attempt in range(max_retries):
         response = make_request(url, headers=headers, timeout=10)
         if response:
-            sleep_time = random.uniform(1, 3)  # Sleep for a random time between 1 and 3 seconds
+            sleep_time = random.uniform(1, 2)  # Sleep for a random time between 1 and 3 seconds
             log.debug(f"Sleeping for {sleep_time:.2f}s")
             time.sleep(sleep_time)
             return response
