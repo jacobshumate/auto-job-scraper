@@ -140,4 +140,4 @@ The `config.json` file contains the configuration options for the scraper and th
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
-This project is licensed under the MIT License.X X
+[![MIT](https://img.shields.io/github/license/qdm12/gluetun)](https://github.com/jacobshumate/auto-job-scraper/blob/main/LICENSE)
