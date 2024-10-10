@@ -136,6 +136,9 @@
                         <h3>{{ job.title }}</h3>
                         <p>{{ job.company }}, {{ job.location }}</p>
                         <p>{{ job.date }}</p>
+                        {% if job.min_salary and job.max_salary %}
+                        <p>${{ "{:,.0f}".format(job.min_salary) }} - ${{ "{:,.0f}".format(job.max_salary) }}</p>
+                        {% endif %}
                     </div>
                 </a>
                 {% endfor %}

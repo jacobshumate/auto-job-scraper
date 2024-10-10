@@ -2,9 +2,12 @@
   "proxies": {
 
   },
-  "headers": {
-
-  },
+  "headers": [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.88 Mobile Safari/537.36",
+  ],
 
   "OpenAI_API_KEY": "",
   "OpenAI_Model": "",
@@ -15,22 +18,24 @@
     {"keywords": "Python developer", "location": "USA", "f_WT": "2"}
 
   ],
-  "desc_words": [
-    "agriculture", "farm", "food safety", "manufacture", "manufacturing", "Bilingual", "chemistry", "FDA", "ICH Guideline", "21 CFR 210",
+  "desc_words_exclude": ["agriculture", "farm", "food safety", "manufacture", "manufacturing", "Bilingual", "chemistry", "FDA", "ICH Guideline", "21 CFR 210",
     "biological sciences", "clinical research", "clinical trials", "drug safety", "ISO 9001", "ISO9001", "Life Sciences", "Biotech", "safety standards", "gt.school", "degree in accounting", "degree in Finance", "ISQM", "ISQM1",
-    "QA/QC", "Electrical Engineering", "IS09001"
-  ],
+    "QA/QC", "Electrical Engineering", "IS09001"],
+  "desc_words_include": [],
+  "desc_words_exclude_regex": ["(?:10|11|12|[789])\\+?\\syears"],
+  "desc_words_include_regex": ["\\bpython(?:\\d{1,2})?\\b"],
   "title_exclude": ["frontend", "fron end", "game"],
   "title_include": ["python", "developer", "backend", "BE", "engineer"],
   "company_exclude": ["ClickJobs.io"],
+  "max_salary": 120000,
   "languages": ["en"],
   "timespan": "r84600",
   "jobs_tablename": "jobs",
   "filtered_jobs_tablename": "filtered_jobs",
   "db_path": "./data/my_database.db",
-  "pages_to_scrape": 10,
+  "pages_to_scrape": 20,
   "rounds": 1,
-  "days_to_scrape": 10,
+  "days_to_scrape": 7,
   "app_table": "jobs"
   }
   

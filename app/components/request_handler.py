@@ -48,11 +48,11 @@ def get_with_retry(url, headers=None, max_retries=MAX_RETRIES, delay=DELAY):
     for attempt in range(max_retries):
         response = make_request(url, headers=headers, timeout=10)
         if response:
-            sleep_time = random.uniform(1, 2)  # Sleep for a random time between 1 and 3 seconds
+            sleep_time = random.uniform(1, 3)  # Sleep for a random time between 1 and 3 seconds
             log.debug(f"Sleeping for {sleep_time:.2f}s")
             time.sleep(sleep_time)
             return response
-        delay = min(delay * 2 + random.uniform(0, 2), 60)
+        delay = min(delay * 2 + random.uniform(0, 2), 45)
         log.info(f"Retrying in {delay:.2f}s...")
         time.sleep(delay)
     log.error(f"Failed to retrieve {url} after {max_retries} attempts.")

@@ -107,7 +107,7 @@ Consists of the `Dockerfile` which sets up everything to automate and run the sc
 The `config.json` file contains the configuration options for the scraper and the web interface. Below is a description of each option:
 
 - `proxies`: (Optional) The proxy settings for the requests library. Set the `http` and `https` keys with the appropriate proxy URLs.
-- `headers`: The headers to be sent with the requests. Set the `User-Agent` key with a valid user agent string. If you don't know your user agen, google "my user agent" and it will show it. It's best to have multiple to avoid detection.
+- `headers`: Randomized rotating headers to be sent with the requests. It's best to have multiple to avoid detection.
 - `OpenAI_API_KEY`: Your OpenAI API key. You can get it from your OpenAI dashboard.
 - `OpenAI_Model`: The name of the OpenAI model to use for cover letter generation. GPT-4 family of models produces best results, but also the most expensive one.
 - `resume_path`: Local path to your resume in PDF format (only PDF is supported at this time). For best results it's advised that your PDF resume is formatted in a way that's easy for the AI to parse. Use a single column format, avoid images. You may get unpredictable results if it's in a two-column format.
@@ -119,12 +119,14 @@ The `config.json` file contains the configuration options for the scraper and th
         -  1 - hybrid
         -  2 - remote
         -  empty (no value) - any one of the above.
-- `desc_words`: An array of keywords to filter out job postings based on their description.
-- `desc_words_regex`: An array of regexes to filter out job postings based on their description. It is advised to only use this or `desc_words`.
+- `desc_words_exclude`: An array of keywords to filter out job postings based on their description.
+- `desc_words_incldue`: An array of keywords to filter in job postings based on their description. 
+- `desc_words_exclude_regex`: An array of regexes to filter out job postings based on their description. It is advised to only use this or `desc_words_exclude`, not both.
+- `desc_words_include_regex`: An array of regexes to filter in job postings based on their description. It is advised to only use this or `desc_words_include`, not both.
 - `title_include`: An array of keywords to filter job postings based on their title. Keep *only* jobs that have at least one of the words from 'title_words' in its title. Leave empty if you don't want to filter by title.
 - `title_exclude`: An array of keywords to filter job postings based on their title. Discard jobs that have ANY of the word from 'title_words' in its title. Leave empty if you don't want to filter by title.
 - `company_exclude`: An array of keywords to filter job postings based on the company name. Discard jobs come from a certain company because life is too short to work for assholes.
-- `max_salary`: Integer to filter out salaries below your maximum preference, in addition, jobs without salaries will not be filteed out.
+- `max_salary`: Integer to filter out salaries below your maximum preference, in addition, jobs without salaries will not be filtered out.
 - `languages`: Script will auto-detect the language from the description. If the language is not in this list, the job will be discarded. Leave empty if you don't want to filter by language. Use "en" for English, "de" for German, "fr" for French, "es" for Spanish, etc. See documentation for langdetect for more details.
 - `timespan`: The time range for the job postings. "r604800" for the past week, "r84600" for the last 24 hours. Basically "r" plus 60 * 60 * 24 * <number of days>.
 - `jobs_tablename`: The name of the table in the SQLite database where the job postings will be stored.
