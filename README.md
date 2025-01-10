@@ -57,7 +57,7 @@ If you are using this application, please be aware that LinkedIn does not allow 
 5. Activation:
    - Run command `docker compose up -d`. Note: this does not run the scraper but instead the container in the background where the scraper will be run every hour of every day.
      - If `Error response from daemon: failed to populate volume: error while mounting volume`, run `docker volume rm auto-job-scraper_db_data`
-   - You can also run the scraper locally using the command `python app/main.py data/config.json >> /data/log/main.log 2>&1` without Gluetun but is highly advised to have an active vpn connection to avoid detection. Note: run this first to populate the database with job postings prior to running app.py.
+   - You can also run the scraper locally using the command `python app/main.py data/config.json >> data/log/main.log 2>&1` without Gluetun but is highly advised to have an active vpn connection to avoid detection. Note: run this first to populate the database with job postings prior to running app.py.
 6. Shutdown/Troubleshoot:
    - Shutdown container with running the command `docker compose down`.
      - If you make any changes to the code, you should also run the command `docker system prune -fa` to delete any cached objects.
