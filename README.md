@@ -79,7 +79,7 @@ The scraper is implemented in `app/main.py`. It scrapes job postings from Linked
 To run the scraper without docker, execute the following command:
 
 ```
-python app/main.py data/config.json >> /data/log/main.log 2>&1
+python app/main.py data/config.json >> data/log/main.log 2>&1
 ```
 
 ### Web Interface
